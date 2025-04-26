@@ -47,10 +47,19 @@ class GameScene(Scene):
         active_player = self.game_controller.get_active_player()
 
         if active_player:
+            moved = False
             if keys[pygame.K_LEFT]:
-                active_player.move_left(dt) # Pass dt directly
+                active_player.move_left() # Don't pass dt here anymore
+                moved = True
             if keys[pygame.K_RIGHT]:
-                active_player.move_right(dt) # Pass dt directly
+                active_player.move_right() # Don't pass dt here anymore
+                moved = True
+
+            # if not moved: # If neither left nor right was pressed
+            #     active_player.stop_moving() # Let update handle stopping vx
+
+        # --- Update game state via controller ---
+        self.game_controller.update(dt)
 
         # --- Update game state via controller ---
         self.game_controller.update(dt) # Call controller's update
