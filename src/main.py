@@ -5,7 +5,7 @@ import pygame
 import json 
 
 from core.scene_manager import SceneManager
-from core.game_controller import GameController
+from core.game_manager import GameManager
 
 CONFIG = {
     "display": {
@@ -29,7 +29,7 @@ def main() -> None:
     screen = pygame.display.set_mode((screen_width, screen_height))
     pygame.display.set_caption(screen_title)
 
-    game_controller = GameController(config)
+    game_controller = GameManager(config)
     scene_manager = SceneManager("MAIN_MENU", screen, game_controller, config)
 
     

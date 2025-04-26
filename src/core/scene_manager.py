@@ -8,10 +8,10 @@ from core.terrain import TerrainMap
 
 from typing import Dict, Any, TYPE_CHECKING
 if TYPE_CHECKING:
-    from core.game_controller import GameController
+    from core.game_manager import GameManager
 
 class SceneManager:
-    def __init__(self, initial_scene_name: str, screen: pygame.Surface, game_controller: GameController, config: Dict[str, Any]) -> None:
+    def __init__(self, initial_scene_name: str, screen: pygame.Surface, game_controller: GameManager, config: Dict[str, Any]) -> None:
         """
         Initializes the SceneManager with the initial scene and screen.
 
