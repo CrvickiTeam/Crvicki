@@ -20,7 +20,7 @@ MAX_STEP_HEIGHT = 4
 AIM_ANGLE_RATE = 60 # Degrees per second
 AIM_POWER_RATE = 50 # Power units per second
 MIN_AIM_POWER = 10
-MAX_AIM_POWER = 100
+MAX_AIM_POWER = 120
 DEFAULT_AIM_POWER = 50
 
 class Player:
