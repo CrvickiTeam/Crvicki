@@ -7,33 +7,25 @@ class GameScene(Scene):
 
     def __init__(self, manager, config) -> None:
         super().__init__(manager, config)
-        # self.font = pygame.font.Font(None, 74) # Keep if needed for UI
-        # self.text = self.font.render("Game Screen", True, (200, 200, 200))
-        # self.text_rect = self.text.get_rect(center=(self.screen_width // 2, self.screen_height // 2))
         self.game_controller = self.manager.game_controller
-        # REMOVE: self.last_dt = 0.0 # No longer needed
 
     def handle_input(self, event: pygame.event.Event) -> None:
         """Handles discrete input events like key presses (not holds) and mouse clicks."""
-        # active_player = self.game_controller.get_active_player() # Get player if needed for non-movement actions
+        active_player = self.game_controller.get_active_player()
 
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_ESCAPE:
                 self.manager.switch_scene("MAIN_MENU")
-            elif event.key == pygame.K_TAB: # Example: Use Tab to switch turns
+            elif event.key == pygame.K_TAB:
                 self.game_controller.next_turn()
-
-            # --- REMOVE Movement handling from KEYDOWN ---
-            # if active_player:
-            #     if event.key == pygame.K_LEFT:
-            #         pass # Movement handled in update
-            #     elif event.key == pygame.K_RIGHT:
-            #         pass # Movement handled in update
-            #     # Handle single-press actions like jump or fire here
-            #     # elif event.key == pygame.K_UP:
-            #     #     active_player.jump()
-            #     # elif event.key == pygame.K_SPACE:
-            #     #     active_player.fire_weapon()
+            # --- Handle Firing ---
+            elif event.key == pygame.K_SPACE:
+                if active_player:
+                    angle, power = active_player.get_shot_info()
+                    # Pass info to game controller to handle projectile creation/firing
+                    self.game_controller.prepare_shot(angle, power)
+                    # Optionally switch turn immediately after firing attempt
+                    # self.game_controller.next_turn()
 
         elif event.type == pygame.MOUSEBUTTONDOWN:
              if event.button == 1: # Left click for explosion (testing)
@@ -42,32 +34,30 @@ class GameScene(Scene):
 
     def update(self, dt: float) -> None:
         """Checks for held keys and updates game logic."""
-        # --- Handle continuous input (key holds) ---
         keys = pygame.key.get_pressed()
         active_player = self.game_controller.get_active_player()
 
         if active_player:
-            moved = False
+            # --- Movement ---
+            if keys[pygame.K_a]: # Use A for left
+                active_player.move_left()
+            if keys[pygame.K_d]: # Use D for right
+                active_player.move_right()
+
+            # --- Aiming ---
             if keys[pygame.K_LEFT]:
-                active_player.move_left() # Don't pass dt here anymore
-                moved = True
+                active_player.aim_up(dt)
             if keys[pygame.K_RIGHT]:
-                active_player.move_right() # Don't pass dt here anymore
-                moved = True
+                active_player.aim_down(dt)
+            if keys[pygame.K_DOWN]: # Use Left Arrow for power down
+                active_player.decrease_power(dt)
+            if keys[pygame.K_UP]: # Use Right Arrow for power up
+                active_player.increase_power(dt)
 
-            # if not moved: # If neither left nor right was pressed
-            #     active_player.stop_moving() # Let update handle stopping vx
-
-        # --- Update game state via controller ---
+        # Update game state via controller
         self.game_controller.update(dt)
-
-        # --- Update game state via controller ---
-        self.game_controller.update(dt) # Call controller's update
 
     def draw(self, screen: pygame.Surface) -> None:
         """Draws the game scene by calling the game controller's draw method."""
-        # Optional: Fill background if controller doesn't handle it
         screen.fill((100, 160, 255)) # Example sky blue
         self.game_controller.draw_components(screen)
-        # Draw any scene-specific UI on top if needed
-        # screen.blit(self.text, self.text_rect)
