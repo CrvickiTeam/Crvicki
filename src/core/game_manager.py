@@ -45,7 +45,7 @@ class GameManager:
         self.current_player_index = 0
         self.running = True
 
-    def next_turn(self):
+    def next_turn(self) -> None:
         """Advances to the next player's turn."""
         if not self.players:
             return
@@ -60,13 +60,10 @@ class GameManager:
             return self.players[self.current_player_index]
         return None
     
-    def update(self, dt: float):
+    def update(self, dt: float) -> None:
         """Updates all game components (terrain physics, players, projectiles)."""
         if not self.running:
             return
-
-        # --- Update Terrain (if it has physics like falling sand) ---
-        # self.terrain.update(dt) # Add this method to Terrain if needed
 
         # --- Update Players ---
         for player in self.players:

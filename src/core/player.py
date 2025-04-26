@@ -4,6 +4,8 @@ import os
 import math
 import numpy as np
 
+#TODO: COMPLETE REVAMP
+
 # Assuming Terrain and TerrainMaterial are importable if needed for type hints
 from .terrain import Terrain, TerrainMaterial # Make sure Terrain is imported
 
