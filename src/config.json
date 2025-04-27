@@ -1,0 +1,64 @@
+{
+    "display": {
+        "width": 1280,
+        "height": 720,
+        "caption": "Crvicki Game",
+        "fps_limit": 60
+    },
+    "game": {
+        "background": {
+            "sky_color": [100, 160, 255],
+            "enable_clouds": true
+        },
+        "terrain": {
+            "materials": [
+                {
+                    "_type": "EMPTY",
+                    "color": [0, 0, 0, 0],
+                    "hardness": 0
+                },
+                {
+                    "_type": "GRASS",
+                    "color": [0, 255, 0, 255],
+                    "hardness": 10
+                },
+                {
+                    "_type": "SOIL",
+                    "color": [139, 69, 19, 255],
+                    "hardness": 10
+                },
+                {
+                    "_type": "STONE",
+                    "color": [128, 128, 128, 255],
+                    "hardness": 30
+                },
+                {
+                    "_type": "BEDROCK",
+                    "color": [50, 50, 50, 255],
+                    "hardness": 0
+                }
+            ],
+            "maps": {
+                "flat": 0
+            }
+        },
+        "player": {
+            "movement": {
+                "drive_speed": 100,
+                "gravity": 400,
+                "step_height": 5
+            },
+            "hitbox": {
+                "width": 20,
+                "height": 20
+            },
+            "aiming": {
+                "min_power": 10,
+                "max_power": 135,
+                "default_power": 50,
+                "angle_change_rate": 60,
+                "power_change_rate": 50
+            }
+        }
+    }   
+}

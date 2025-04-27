@@ -9,10 +9,11 @@ class Scene:
     """Base class for all scenes in the game."""
 
     def __init__(self, manager: SceneManager, config: Dict[str, Any]) -> None:
-        self.manager = manager
         self.config = config
-        self.screen_width: int = config.get("display", {}).get("width", 800)
-        self.screen_height: int = config.get("display", {}).get("height", 600)
+        self.screen_width: int = config.get("display", {}).get("width", 1280)
+        self.screen_height: int = config.get("display", {}).get("height", 720)
+
+        self.manager = manager
 
     def handle_input(self, event: Event) -> None:
         """Process events (keyboard, mouse, etc.)."""
