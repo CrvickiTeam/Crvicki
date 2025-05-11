@@ -51,21 +51,24 @@ class Projectile:
         check_x = int(self.x)
         check_y = int(self.y)
 
-        # 1. Boundary Check
-        if not (0 <= check_x < terrain.width and 0 <= check_y < terrain.height):
+        # 1. Boundary Check (Allow going above screen, y < 0)
+        # Finish if outside left/right bounds OR below bottom bound
+        if not (0 <= check_x < terrain.width and check_y < terrain.height):
             self._finished = True
             # Optional: Explode even if out of bounds? Or just disappear?
             # game_manager.explode(check_x, check_y) # Example: Explode where it went out
             return # Stop further processing if out of bounds
 
         # 2. Terrain Collision Check (simple point check at center)
-        # More robust checks might use the projectile's rect or shape
-        # Assuming terrain.logic_grid uses [x, y] indexing
-        if terrain.logic_grid[check_x, check_y] != 0: # 0 is TerrainMaterial.EMPTY.value
-            self._finished = True
-            # Trigger explosion via GameManager
-            game_manager.explode(check_x, check_y)
-            return # Stop further processing after collision
+        # Only check terrain if within vertical bounds (y >= 0)
+        if check_y >= 0:
+            # More robust checks might use the projectile's rect or shape
+            # Assuming terrain.logic_grid uses [x, y] indexing
+            if terrain.logic_grid[check_x, check_y] != 0: # 0 is TerrainMaterial.EMPTY.value
+                self._finished = True
+                # Trigger explosion via GameManager
+                game_manager.explode(check_x, check_y)
+                return # Stop further processing after collision
 
     def draw(self, screen: pygame.Surface):
         """
@@ -76,11 +79,11 @@ class Projectile:
         """
         if self._finished:
             return
-        # Draw a simple circle
+        # Draw a simple circle (even if it's above the screen, pygame handles clipping)
         pygame.draw.circle(screen, (255, 255, 255), (int(self.x), int(self.y)), PROJECTILE_SIZE)
 
     def is_finished(self) -> bool:
         """
-        Returns True if the projectile has collided or gone out of bounds.
+        Returns True if the projectile has collided or gone out of bounds (excluding above screen).
         """
         return self._finished

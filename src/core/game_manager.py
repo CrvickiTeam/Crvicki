@@ -1,16 +1,13 @@
 import pygame
 import numpy as np
-from typing import Dict, Any, Tuple, List, Optional # Add Optional
+from typing import Dict, Any, Tuple, List, Optional
 
 from .terrain import Terrain, TerrainMap
 from .player import Player, PlayerTeam
-# Import Weapon base and specific weapons/projectiles
 from .weapons.weapon import Weapon
 from .weapons.basic_cannon import BasicCannon
-# Projectile import might not be directly needed here if Weapon handles drawing
 
 def simple_explosion_gradient(x: int, y: int, radius: int, center_strength: int) -> Tuple[int, int, np.ndarray]:
-    # ... (gradient function remains the same) ...
     gradient = np.zeros((radius * 2 + 1, radius * 2 + 1), dtype=np.uint8)
     center_x, center_y = radius, radius
     for i in range(gradient.shape[0]):
@@ -23,6 +20,7 @@ def simple_explosion_gradient(x: int, y: int, radius: int, center_strength: int)
     start_x = x - radius; start_y = y - radius
     return start_x, start_y, gradient
 
+
 class GameManager:
     def __init__(self, config: dict) -> None:
         self.config = config
@@ -30,10 +28,8 @@ class GameManager:
         self.players: List[Player] = []
         self.current_player_index: int = 0
         self.running: bool = False
-        # Store the currently active weapon effect (if any)
         self.active_weapon: Optional[Weapon] = None
 
-    # ... (start_new_game remains the same) ...
     def start_new_game(self, map: TerrainMap) -> None:
         self.terrain = Terrain(map, self.config)
         self.players = []
@@ -44,17 +40,15 @@ class GameManager:
         self.players.append(player1)
         self.players.append(player2)
         self.current_player_index = 0
-        self.active_weapon = None # Ensure no weapon active at start
+        self.active_weapon = None
         self.running = True
         print("Game started. Player 0's turn.")
 
     def next_turn(self):
         if not self.players: return
-        # Ensure no weapon effect carries over
         self.active_weapon = None
         self.current_player_index = (self.current_player_index + 1) % len(self.players)
         print(f"Turn changed to Player {self.current_player_index}")
-        # TODO: Reset turn timer, player state (e.g., allow movement again)
 
     def get_active_player(self) -> Player | None:
         if self.running and self.players and 0 <= self.current_player_index < len(self.players):
@@ -63,32 +57,23 @@ class GameManager:
 
     def update(self, dt: float) -> None:
         if not self.running: return
-
-        # --- Update Active Weapon Effect ---
         if self.active_weapon:
             self.active_weapon.update(dt, self.terrain)
             if self.active_weapon.is_finished():
-                self.active_weapon = None # Clear the finished weapon
-                self.next_turn() # Switch turn AFTER weapon effect is done
+                self.active_weapon = None
+                self.next_turn()
         else:
-            # --- Update Players (only if no weapon is active?) ---
-            # Decide if players can move while a projectile is flying.
-            # For now, let's allow player updates regardless.
             for player in self.players:
                 player.update(dt, self.terrain)
 
     def explode(self, x: int, y: int) -> None:
         if not self.terrain: return
-        # TODO: Add configuration for explosion radius/strength
-        radius = 40
+        radius = 25
         strength = 100
         origin_x, origin_y, gradient = simple_explosion_gradient(x, y, radius, strength)
         self.terrain.destroy_terrain((origin_x, origin_y), gradient)
-        # TODO: Check for damage to players within the explosion radius
 
     def prepare_shot(self, angle: float, power: float):
-        """Creates and activates the selected weapon."""
-        # Prevent firing if a weapon effect is already active
         if self.active_weapon:
             print("Cannot fire: Weapon effect already in progress.")
             return
@@ -101,33 +86,18 @@ class GameManager:
         print(f"  Angle: {angle:.2f} degrees")
         print(f"  Power: {power:.2f}")
 
-        # --- Create and activate the weapon ---
-        # TODO: Select weapon based on player's inventory/choice
-        # For now, always use BasicCannon
+
         weapon_instance = BasicCannon(active_player, self)
         weapon_instance.activate(angle, power)
-
-        # Store the active weapon instance
         self.active_weapon = weapon_instance
-
-        # DO NOT switch turn here anymore. Turn switches in update() when weapon.is_finished().
 
 
     def draw_components(self, screen: pygame.Surface) -> None:
         if not self.running: return
-
-        # Draw terrain
         if self.terrain: self.terrain.draw(screen)
-
-        # Draw players
         for player in self.players: player.draw(screen)
+        if self.active_weapon: self.active_weapon.draw(screen)
 
-        # --- Draw Active Weapon Effect (Projectiles) ---
-        if self.active_weapon:
-            self.active_weapon.draw(screen)
-
-        # Draw active player indicator (only if no weapon is active?)
-        # Or maybe always draw it? Your choice.
         if not self.active_weapon:
             active_player = self.get_active_player()
             if active_player:
