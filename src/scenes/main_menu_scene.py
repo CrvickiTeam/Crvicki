@@ -81,13 +81,30 @@ class MainMenuScene(Scene):
             if event.button == 1: # Left mouse button
                 if self.start_button_rect.collidepoint(event.pos):
                     print("Start Game button clicked!")
+                    # Store the settings in the shared config dictionary
+                    # This config is accessible by other scenes, including GameScene.
+                    if 'game_settings' not in self.config:
+                        self.config['game_settings'] = {}
+                    self.config['game_settings']['player_count'] = self.player_count
+                    self.config['game_settings']['game_mode'] = self.game_mode
+                    
+                    print(f"Settings stored in config: {self.config['game_settings']}")
+                    
                     self.manager.switch_scene("GAME")
                 elif self.player_count_button_rect.collidepoint(event.pos):
-                    print(f"Player count button clicked! Current value: {self.player_count}")
-                    # No functionality to change value yet
+                    if self.player_count == 2:
+                        self.player_count = 3
+                    elif self.player_count == 3:
+                        self.player_count = 4
+                    elif self.player_count == 4:
+                        self.player_count = 2
+                    print(f"Player count changed to: {self.player_count}")
                 elif self.game_mode_button_rect.collidepoint(event.pos):
-                    print(f"Game mode button clicked! Current mode: {self.game_mode}")
-                    # No functionality to change mode yet
+                    if self.game_mode == "FFA":
+                        self.game_mode = "TEAMS"
+                    else:
+                        self.game_mode = "FFA"
+                    print(f"Game mode changed to: {self.game_mode}")
 
     def update(self, dt: float) -> None:
         mouse_pos = pygame.mouse.get_pos()
