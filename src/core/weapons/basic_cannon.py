@@ -39,7 +39,7 @@ class BasicCannon(Weapon):
         start_pos = (self.owner.x, self.owner.y)
 
         # Create the projectile
-        projectile = BasicProjectile(start_pos, initial_vx, initial_vy)
+        projectile = BasicProjectile(start_pos, initial_vx, initial_vy, self.owner)
 
         # Add it to the list managed by this weapon instance
         self.projectiles.append(projectile)

@@ -6,8 +6,9 @@ class BasicProjectile(Projectile):
     A simple projectile that moves under gravity and explodes on impact.
     Inherits most functionality from the base Projectile class.
     """
-    def __init__(self, start_pos: tuple[float, float], initial_vx: float, initial_vy: float):
-        super().__init__(start_pos, initial_vx, initial_vy)
+    def __init__(self, start_pos: tuple[float, float], initial_vx: float, initial_vy: float, owner):
+        super().__init__(start_pos, initial_vx, initial_vy, owner)
+
         # No additional initialization needed for this basic version
 
     # update() is inherited from Projectile

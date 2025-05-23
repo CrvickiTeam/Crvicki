@@ -14,7 +14,7 @@ PROJECTILE_SIZE = 5 # Radius for drawing
 class Projectile:
     """Base class for projectiles."""
 
-    def __init__(self, start_pos: tuple[float, float], initial_vx: float, initial_vy: float):
+    def __init__(self, start_pos: tuple[float, float], initial_vx: float, initial_vy: float, owner):
         """
         Initializes the projectile.
 
@@ -27,6 +27,7 @@ class Projectile:
         self.vx = initial_vx
         self.vy = initial_vy
         self._finished = False # Flag to indicate if the projectile is done
+        self.owner = owner
 
     def update(self, dt: float, terrain: 'Terrain', game_manager: 'GameManager'):
         """
@@ -36,7 +37,7 @@ class Projectile:
             dt: Delta time.
             terrain: The game terrain.
             game_manager: Reference to the game manager to trigger effects (e.g., explosions).
-        """
+        """ 
         if self._finished:
             return
 
@@ -50,6 +51,17 @@ class Projectile:
         # --- Collision Checks ---
         check_x = int(self.x)
         check_y = int(self.y)
+
+        # 0. Player Collision Check (direct hit detection)
+        for player in game_manager.players:
+            if not player.alive or player == self.owner:
+                continue
+            if player.rect.collidepoint(check_x, check_y):
+                max_damage = 50  # Same damage as explosion center (adjustable)
+                player.apply_damage(max_damage)
+                print(f"Direct hit on {player.team.name}! Took {max_damage} damage.")
+                self._finished = True
+                return # Stop further processing after direct hit
 
         # 1. Boundary Check (Allow going above screen, y < 0)
         # Finish if outside left/right bounds OR below bottom bound
@@ -67,7 +79,7 @@ class Projectile:
             if terrain.logic_grid[check_x, check_y] != 0: # 0 is TerrainMaterial.EMPTY.value
                 self._finished = True
                 # Trigger explosion via GameManager
-                game_manager.explode(check_x, check_y)
+                game_manager.explode(check_x, check_y, owner=self.owner)
                 return # Stop further processing after collision
 
     def draw(self, screen: pygame.Surface):

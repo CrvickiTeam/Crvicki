@@ -1,5 +1,6 @@
 import pygame
 import numpy as np
+import math
 from typing import Dict, Any, Tuple, List, Optional
 
 from .terrain import Terrain, TerrainMap
@@ -66,12 +67,26 @@ class GameManager:
             for player in self.players:
                 player.update(dt, self.terrain)
 
-    def explode(self, x: int, y: int) -> None:
+    def explode(self, x: int, y: int, owner=None) -> None:
         if not self.terrain: return
         radius = 25
         strength = 100
         origin_x, origin_y, gradient = simple_explosion_gradient(x, y, radius, strength)
         self.terrain.destroy_terrain((origin_x, origin_y), gradient)
+        explosion_pos = (x, y)
+        max_damage = 50  # prilagodi po želji
+
+        for player in self.players:
+            if not player.alive or player == owner:
+                continue
+            dx = player.x - explosion_pos[0]
+            dy = player.y - explosion_pos[1]
+            distance = math.hypot(dx, dy)
+
+            if distance < radius:
+                damage = int(max_damage * (1 - distance / radius))
+                player.apply_damage(damage)
+                print(f"Player {player.team.name} took {damage} damage! Remaining HP: {player.health}")
 
     def prepare_shot(self, angle: float, power: float):
         if self.active_weapon:

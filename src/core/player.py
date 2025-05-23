@@ -18,6 +18,7 @@ class Player:
         self.config = config
         self.team = team
         self.alive = True
+        self.health = 100
 
         self.x, self.y = float(start_pos[0]), float(start_pos[1])
         self.angle = 0.0
@@ -196,4 +197,23 @@ class Player:
         end_x = self.x + line_length * math.cos(aim_rad)
         end_y = self.y - line_length * math.sin(aim_rad)
 
+        # Draw health bar
+        bar_width = 40
+        bar_height = 6
+        fill = (self.health / 100) * bar_width
+
+        # Health bar is narisan nad igralcem
+        bar_x = self.x - bar_width // 2
+        bar_y = self.y - self.height // 2 - 10
         pygame.draw.line(screen, (255, 255, 255), (int(self.x), int(self.y)), (int(end_x), int(end_y)), 2)
+        pygame.draw.rect(screen, (255, 0, 0), (bar_x, bar_y, fill, bar_height))  # rdeče polnilo
+        pygame.draw.rect(screen, (255, 255, 255), (bar_x, bar_y, bar_width, bar_height), 1)  # bel okvir
+        
+    def apply_damage(self, damage: int):
+        if not self.alive:
+            return
+        self.health -= damage
+        if self.health <= 0:
+            self.health = 0
+            self.alive = False
+            print(f"Player from team {self.team.name} has died.")
