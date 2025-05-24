@@ -34,59 +34,132 @@ class GameManager:
     def start_new_game(self, map: TerrainMap) -> None:
         self.terrain = Terrain(map, self.config)
         self.players = []
-        player1_start_pos = (200, 200)
+        # TODO: Get player count from config['game_settings']['player_count']
+        # For now, defaulting to 2 players
+        player1_start_pos = (200, 200) # These positions should be dynamic or from config
         player2_start_pos = (self.terrain.width - 200, 200)
+        
+        # Example: Use game_settings if available
+        game_settings = self.config.get('game_settings', {})
+        player_count = game_settings.get('player_count', 2) # Default to 2 if not set
+
+        # For simplicity, still hardcoding 2 players for now, but showing where to use player_count
+        # Actual player creation logic would need to adapt if player_count > 2
+
         player1 = Player(player1_start_pos, PlayerTeam.TEAM_1, self.config)
         player2 = Player(player2_start_pos, PlayerTeam.TEAM_2, self.config)
         self.players.append(player1)
         self.players.append(player2)
+
+        # Add more players based on player_count if logic is expanded
+        # if player_count >= 3:
+        #     player3_start_pos = (self.terrain.width // 2, 150)
+        #     player3 = Player(player3_start_pos, PlayerTeam.TEAM_1, self.config) # Or new team
+        #     self.players.append(player3)
+        # if player_count >= 4:
+        #     player4_start_pos = (self.terrain.width // 2 + 100, 150)
+        #     player4 = Player(player4_start_pos, PlayerTeam.TEAM_2, self.config) # Or new team
+        #     self.players.append(player4)
+
+
         self.current_player_index = 0
         self.active_weapon = None
         self.running = True
         print("Game started. Player 0's turn.")
 
     def next_turn(self):
-        if not self.players: return
+        if not self.players or not self.running: return # Check self.running
         self.active_weapon = None
-        self.current_player_index = (self.current_player_index + 1) % len(self.players)
-        print(f"Turn changed to Player {self.current_player_index}")
+        
+        # Find the next alive player
+        original_index = self.current_player_index
+        while True:
+            self.current_player_index = (self.current_player_index + 1) % len(self.players)
+            if self.players[self.current_player_index].alive:
+                print(f"Turn changed to Player {self.current_player_index}")
+                break
+            if self.current_player_index == original_index: # Cycled through all players, none are alive (should be caught by is_game_over)
+                print("No alive players left to switch turn to.")
+                self.running = False # Should be caught by game over logic earlier
+                break
 
     def get_active_player(self) -> Player | None:
         if self.running and self.players and 0 <= self.current_player_index < len(self.players):
-            return self.players[self.current_player_index]
+            if self.players[self.current_player_index].alive:
+                return self.players[self.current_player_index]
         return None
 
-    def update(self, dt: float) -> None:
-        if not self.running: return
+    def is_game_over(self) -> bool:
+        if not self.players:
+            return False # No players, game can't be over in a typical sense yet
+
+        alive_players = [p for p in self.players if p.alive]
+        num_alive_players = len(alive_players)
+
+        if len(self.players) == 0 : # Should not happen if game started
+            return False
+        if len(self.players) == 1: # Single player mode (if ever implemented)
+             return num_alive_players == 0
+
+        # For 2+ players (current FFA setup): game is over if 1 or 0 players are left alive.
+        if num_alive_players <= 1:
+            if num_alive_players == 1:
+                print(f"Game Over! Player {alive_players[0].team.name} is the winner!")
+            else:
+                print("Game Over! No players left alive.")
+            return True
+        return False
+
+    def update(self, dt: float) -> Optional[str]: 
+        if not self.running:
+            return None # Or "GAME_ALREADY_ENDED" if specific status needed
+
         if self.active_weapon:
             self.active_weapon.update(dt, self.terrain)
             if self.active_weapon.is_finished():
                 self.active_weapon = None
+                if self.is_game_over():
+                    self.running = False # Stop game logic
+                    return "GAME_OVER"
                 self.next_turn()
         else:
-            for player in self.players:
-                player.update(dt, self.terrain)
+            # Player movement updates (less likely to cause game over directly)
+            # This part of update is mostly for player input handling before a shot
+            # The primary game over check is after a weapon action.
+            pass # Player movement is handled by GameScene based on input
+
+        # Fallback check, though primary check is after weapon action
+        if self.is_game_over() and self.running: # Check self.running to avoid double "GAME_OVER"
+            self.running = False
+            return "GAME_OVER"
+            
+        return None
 
     def explode(self, x: int, y: int, owner=None) -> None:
         if not self.terrain: return
-        radius = 25
-        strength = 100
+        radius = 25 # Explosion radius from config or weapon
+        strength = 100 # Explosion strength from config or weapon
         origin_x, origin_y, gradient = simple_explosion_gradient(x, y, radius, strength)
         self.terrain.destroy_terrain((origin_x, origin_y), gradient)
         explosion_pos = (x, y)
-        max_damage = 50  # prilagodi po želji
+        max_damage = 50  # Max damage at center, from config or weapon
 
         for player in self.players:
-            if not player.alive or player == owner:
+            if not player.alive: # Don't process already dead players
                 continue
+            # if player == owner: # Typically, owner is not immune unless specified by weapon
+            #     continue
             dx = player.x - explosion_pos[0]
             dy = player.y - explosion_pos[1]
             distance = math.hypot(dx, dy)
 
             if distance < radius:
                 damage = int(max_damage * (1 - distance / radius))
-                player.apply_damage(damage)
+                player.apply_damage(damage) # apply_damage sets player.alive to False if HP <= 0
                 print(f"Player {player.team.name} took {damage} damage! Remaining HP: {player.health}")
+        
+        # No immediate game over check here, it will be caught by the main update loop
+        # when the weapon action finishes. This keeps explode focused on damage.
 
     def prepare_shot(self, angle: float, power: float):
         if self.active_weapon:
@@ -95,6 +168,7 @@ class GameManager:
 
         active_player = self.get_active_player()
         if not active_player:
+            print("Cannot fire: No active player.")
             return
 
         print(f"Player {self.current_player_index} firing!")
