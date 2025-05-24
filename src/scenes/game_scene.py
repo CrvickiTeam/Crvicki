@@ -28,22 +28,37 @@ class GameScene(Scene):
 
     def update(self, dt: float) -> None:
         keys = pygame.key.get_pressed()
-        active_player = self.game_controller.get_active_player()
-        if active_player:
-            if keys[pygame.K_a]:
-                active_player.move_left()
-            if keys[pygame.K_d]:
-                active_player.move_right()
+        
+        if self.game_controller.running:
+            # Update all players' physics and state
+            for player in self.game_controller.players:
+                if player.alive: # Only update alive players
+                    player.update(dt, self.game_controller.terrain)
 
-            if keys[pygame.K_LEFT]:
-                active_player.aim_up(dt)
-            if keys[pygame.K_RIGHT]:
-                active_player.aim_down(dt)
-            if keys[pygame.K_DOWN]:
-                active_player.decrease_power(dt)
-            if keys[pygame.K_UP]:
-                active_player.increase_power(dt)
-        self.game_controller.update(dt)
+            # Handle input for the active player
+            active_player = self.game_controller.get_active_player()
+            if active_player: # active_player is already checked for being alive by get_active_player
+                if not self.game_controller.active_weapon: # Only allow player input if no weapon is active
+                    if keys[pygame.K_a]:
+                        active_player.move_left()
+                    if keys[pygame.K_d]:
+                        active_player.move_right()
+
+                    if keys[pygame.K_LEFT]: # Aiming keys
+                        active_player.aim_up(dt)
+                    if keys[pygame.K_RIGHT]:
+                        active_player.aim_down(dt)
+                    if keys[pygame.K_DOWN]:
+                        active_player.decrease_power(dt)
+                    if keys[pygame.K_UP]:
+                        active_player.increase_power(dt)
+        
+        # Update game controller (handles weapons, turns, game over checks)
+        game_status = self.game_controller.update(dt)
+
+        if game_status == "GAME_OVER":
+            print("GameScene: Detected GAME_OVER, switching to MAIN_MENU.")
+            self.manager.switch_scene("MAIN_MENU")
 
     def draw(self, screen: pygame.Surface) -> None:
         screen.fill((100, 160, 255))
