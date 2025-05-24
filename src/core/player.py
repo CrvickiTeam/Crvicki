@@ -1,11 +1,17 @@
+from typing import TYPE_CHECKING
+
 import pygame
 from enum import Enum
 import os
 import math
 import numpy as np
+from typing import TYPE_CHECKING
 
 # Assuming Terrain and TerrainMaterial are importable if needed for type hints
 from .terrain import Terrain, TerrainMaterial # Make sure Terrain is imported
+
+if TYPE_CHECKING:
+    from .game_manager import GameManager # Za type hinting, prepreči ciklični uvoz
 
 class PlayerTeam(Enum):
     TEAM_1 = 1
@@ -14,9 +20,10 @@ class PlayerTeam(Enum):
 # Removed global constants, they will be loaded from config or defaults set in __init__
 
 class Player:
-    def __init__(self, start_pos: tuple[int, int], team: PlayerTeam, config: dict) -> None:
+    def __init__(self, start_pos: tuple[int, int], team: PlayerTeam, config: dict,game_manager: 'GameManager') -> None:
         self.config = config
         self.team = team
+        self.game_manager = game_manager # Shrani referenco na GameManager
         self.alive = True
         self.health = 100
 
@@ -29,6 +36,7 @@ class Player:
         movement_cfg = player_cfg.get("movement", {})
         hitbox_cfg = player_cfg.get("hitbox", {})
         aiming_cfg = player_cfg.get("aiming", {})
+        sprite_cfg = player_cfg.get("sprites", {})# Za prihodnjo uporabo
 
         # Use current global values as defaults if not found in config
         self.speed = movement_cfg.get("drive_speed", 100)
@@ -54,8 +62,77 @@ class Player:
         self.aim_angle = 45.0 if self.direction == 1 else 135.0
         self.aim_power = self.default_aim_power # Use loaded default
 
+        # --- Nalaganje slik ---
+        self.active_tank_image_orig: pygame.Surface | None = None
+        self.waiting_tank_image_orig: pygame.Surface | None = None
+        self.pipe_image_orig: pygame.Surface | None = None
+        self.load_sprites()
+
+        # --- Prilagoditev širine/višine glede na naložene slike ali config ---
+        loaded_cfg_width = hitbox_cfg.get("width")
+        loaded_cfg_height = hitbox_cfg.get("height")
+
+        if self.active_tank_image_orig:
+            base_img_w = self.active_tank_image_orig.get_width()
+            base_img_h = self.active_tank_image_orig.get_height()
+
+            if loaded_cfg_width and loaded_cfg_height:
+                self.width = loaded_cfg_width
+                self.height = loaded_cfg_height
+                self.active_tank_image_orig = pygame.transform.scale(self.active_tank_image_orig,
+                                                                     (self.width, self.height))
+                if self.waiting_tank_image_orig:
+                    self.waiting_tank_image_orig = pygame.transform.scale(self.waiting_tank_image_orig,
+                                                                          (self.width, self.height))
+            else:
+                self.width = base_img_w
+                self.height = base_img_h
+        elif loaded_cfg_width and loaded_cfg_height:
+            self.width = loaded_cfg_width
+            self.height = loaded_cfg_height
+
         self.rect = pygame.Rect(0, 0, self.width, self.height)
         self.rect.center = (int(self.x), int(self.y))
+
+    def load_sprites(self):
+        script_dir = os.path.dirname(__file__)
+        project_root = os.path.abspath(os.path.join(script_dir, "..", ".."))
+        base_path = os.path.join(project_root, "assets", "graphics", "characters")
+
+        try:
+            self.active_tank_image_orig = pygame.image.load(
+                os.path.join(base_path, "GREEN-01ORIGINAL-TANK.png")).convert_alpha()
+            self.waiting_tank_image_orig = pygame.image.load(
+                os.path.join(base_path, "GREEN-02OPEN-WORM-HAT-TANK.png")).convert_alpha()
+            self.pipe_image_orig = pygame.image.load(os.path.join(base_path, "TANK-PIPE.png")).convert_alpha()
+        except pygame.error as e:
+            print(f"Error loading player sprites: {e}")
+            try:
+                placeholder_path = os.path.join(project_root, "assets", "graphics",
+                                                "missing.png")  # Pot do missing.png v assets/graphics
+                placeholder_img = pygame.image.load(placeholder_path).convert_alpha()
+                ph_width = self.width
+                ph_height = self.height
+
+                if self.active_tank_image_orig is None:
+                    self.active_tank_image_orig = pygame.transform.scale(placeholder_img, (ph_width, ph_height))
+                if self.waiting_tank_image_orig is None:
+                    self.waiting_tank_image_orig = pygame.transform.scale(placeholder_img, (ph_width, ph_height))
+                if self.pipe_image_orig is None:
+                    self.pipe_image_orig = pygame.transform.scale(placeholder_img, (
+                    max(1, ph_width // 2), max(1, ph_height // 4)))  # Zagotovi pozitivne dimenzije
+            except pygame.error as e_miss:
+                print(f"Error loading placeholder sprite: {e_miss}")
+                ph_width = self.width
+                ph_height = self.height
+                fallback_surface = pygame.Surface((ph_width, ph_height), pygame.SRCALPHA)
+                fallback_surface.fill((255, 0, 255, 128))
+                if self.active_tank_image_orig is None: self.active_tank_image_orig = fallback_surface
+                if self.waiting_tank_image_orig is None: self.waiting_tank_image_orig = fallback_surface.copy()
+                if self.pipe_image_orig is None:
+                    self.pipe_image_orig = pygame.Surface((max(1, ph_width // 2), max(1, ph_height // 4)),
+                                                          pygame.SRCALPHA)  # Zagotovi pozitivne dimenzije
+                    self.pipe_image_orig.fill((255, 0, 255, 128))
 
     def move_left(self):
         self.vx = -self.speed # Use instance attribute
@@ -162,8 +239,8 @@ class Player:
                  if y_scan >= terrain.height: break
                  # Use Enum value
                  if terrain.logic_grid[right_x, y_scan] != TerrainMaterial.EMPTY.value: right_y = y_scan; break
-            delta_x = (right_x - left_x); delta_y = (right_y - left_y)
-            if delta_x != 0: self.angle = -math.degrees(math.atan2(delta_y, delta_x))
+            delta_x_val = (right_x - left_x); delta_y_val = (right_y - left_y)
+            if delta_x_val != 0: self.angle = -math.degrees(math.atan2(delta_y_val, delta_x_val))
             else: self.angle = 0.0
         elif not blocked_by_boundary_y: self.y = target_y; self.is_grounded = False
         elif blocked_by_boundary_y: self.y = target_y
@@ -176,26 +253,93 @@ class Player:
         if not self.alive:
             return
 
-        # Draw Rotated Hitbox
-        half_w, half_h = self.width / 2, self.height / 2
-        points = [(-half_w, -half_h), ( half_w, -half_h), ( half_w,  half_h), (-half_w,  half_h)]
-        angle_rad = math.radians(self.angle); cos_a, sin_a = math.cos(angle_rad), math.sin(angle_rad)
-        rotated_points = []
-        for px, py in points:
-            x_rot = px * cos_a - py * sin_a; y_rot = px * sin_a + py * cos_a
-            rotated_points.append((int(self.x + x_rot), int(self.y + y_rot)))
-        hitbox_color = (255, 0, 0) if self.team == PlayerTeam.TEAM_1 else (0, 0, 255)
-        pygame.draw.polygon(screen, hitbox_color, rotated_points, 1)
+        is_active_player = (self.game_manager.get_active_player() == self)
+        current_tank_image_orig = self.active_tank_image_orig if is_active_player else self.waiting_tank_image_orig
 
-        # Draw center dot
-        center_color = (255, 255, 0); pygame.draw.circle(screen, center_color, (int(self.x), int(self.y)), 3)
+        # --- Risanje tanka ---
+        if current_tank_image_orig:
+            rotated_tank_image = pygame.transform.rotate(current_tank_image_orig, self.angle)
+            tank_rect = rotated_tank_image.get_rect(center=(int(self.x), int(self.y)))
+            screen.blit(rotated_tank_image, tank_rect.topleft)
+        else:
+            # Fallback: nariši hitbox, če slike ni (originalna logika hitboxa)
+            half_w, half_h = self.width / 2, self.height / 2
+            points = [(-half_w, -half_h), (half_w, -half_h), (half_w, half_h), (-half_w, half_h)]
+            angle_rad_body = math.radians(self.angle);
+            cos_a, sin_a = math.cos(angle_rad_body), math.sin(angle_rad_body)
+            rotated_points = []
+            for px, py in points:
+                x_rot = px * cos_a - py * sin_a;
+                y_rot = px * sin_a + py * cos_a
+                rotated_points.append((int(self.x + x_rot), int(self.y + y_rot)))
+            hitbox_color = (255, 0, 0) if self.team == PlayerTeam.TEAM_1 else (0, 0, 255)
+            pygame.draw.polygon(screen, hitbox_color, rotated_points, 1)
+            center_color = (255, 255, 0);
+            pygame.draw.circle(screen, center_color, (int(self.x), int(self.y)), 3)
 
-        # --- Draw Aiming Indicator ---
-        aim_rad = math.radians(self.aim_angle)
-        # Use instance attribute for max power
-        line_length = (self.aim_power / self.max_aim_power) * 50
-        end_x = self.x + line_length * math.cos(aim_rad)
-        end_y = self.y - line_length * math.sin(aim_rad)
+        # --- Risanje cevi (samo za aktivnega igralca in če slika cevi obstaja) ---
+        aim_rad_for_pipe_indicator = math.radians(self.aim_angle)  # Shranimo za kasneje
+        pipe_display_angle = -self.aim_angle  # Pygame rotira v nasprotni smeri urinega kazalca,
+        # zato negiramo matematični kot za pravilen prikaz
+
+        if is_active_player and self.pipe_image_orig:
+            rotated_pipe_image = pygame.transform.rotate(self.pipe_image_orig, pipe_display_angle)
+
+            pipe_attach_offset_y_local = -self.height * 0.15
+
+            angle_rad_body = math.radians(self.angle)
+            cos_a_body = math.cos(angle_rad_body)
+            sin_a_body = math.sin(angle_rad_body)
+
+            rotated_attach_offset_x = -pipe_attach_offset_y_local * sin_a_body
+            rotated_attach_offset_y = pipe_attach_offset_y_local * cos_a_body
+
+            pipe_mount_point_x = self.x + rotated_attach_offset_x
+            pipe_mount_point_y = self.y + rotated_attach_offset_y
+
+            pipe_center_to_connector_offset_x = -self.pipe_image_orig.get_width() / 2.0
+
+            # Rotiramo ta odmik z `pipe_display_angle`
+            cos_display_pipe = math.cos(math.radians(pipe_display_angle))
+            sin_display_pipe = math.sin(math.radians(pipe_display_angle))
+
+            actual_connector_offset_x = pipe_center_to_connector_offset_x * cos_display_pipe  # Y komponenta ni potrebna, ker je offset samo po X
+            actual_connector_offset_y = pipe_center_to_connector_offset_x * sin_display_pipe
+
+            target_pipe_center_x = pipe_mount_point_x - actual_connector_offset_x
+            target_pipe_center_y = pipe_mount_point_y - actual_connector_offset_y
+
+            pipe_rect = rotated_pipe_image.get_rect(center=(int(target_pipe_center_x), int(target_pipe_center_y)))
+            screen.blit(rotated_pipe_image, pipe_rect.topleft)
+
+            # --- Risanje indikatorja za ciljanje (črta iz konca cevi) ---
+            # Uporabimo aim_rad_for_pipe_indicator (matematični kot)
+            cos_aim_math = math.cos(aim_rad_for_pipe_indicator)
+            sin_aim_math = math.sin(aim_rad_for_pipe_indicator)
+
+            pipe_center_to_tip_offset_x = self.pipe_image_orig.get_width() / 2.0
+
+            # Odmik konice cevi od njenega centra, rotiran z `pipe_display_angle` za pravilen prikaz
+            actual_tip_offset_x_display = pipe_center_to_tip_offset_x * cos_display_pipe
+            actual_tip_offset_y_display = pipe_center_to_tip_offset_x * sin_display_pipe
+
+            line_start_x = target_pipe_center_x + actual_tip_offset_x_display
+            line_start_y = target_pipe_center_y + actual_tip_offset_y_display
+
+            line_length = (self.aim_power / self.max_aim_power) * 30
+
+            # Za konec črte uporabimo matematični kot, ker želimo smer ciljanja
+            line_end_x = line_start_x + line_length * cos_aim_math
+            line_end_y = line_start_y - line_length * sin_aim_math  # Minus, ker Y os Pygame kaže navzdol
+
+            pygame.draw.line(screen, (255, 255, 255), (int(line_start_x), int(line_start_y)),
+                             (int(line_end_x), int(line_end_y)), 2)
+        elif is_active_player:  # Če ni slike cevi, ampak je aktiven, nariši originalno črto ciljanja
+            aim_rad = math.radians(self.aim_angle)
+            line_length = (self.aim_power / self.max_aim_power) * 50
+            end_x = self.x + line_length * math.cos(aim_rad)
+            end_y = self.y - line_length * math.sin(aim_rad)  # -sin(aim_rad) ker y raste navzdol
+            pygame.draw.line(screen, (255, 255, 255), (int(self.x), int(self.y)), (int(end_x), int(end_y)), 2)
 
         # Draw health bar
         bar_width = 40
@@ -205,7 +349,6 @@ class Player:
         # Health bar is narisan nad igralcem
         bar_x = self.x - bar_width // 2
         bar_y = self.y - self.height // 2 - 10
-        pygame.draw.line(screen, (255, 255, 255), (int(self.x), int(self.y)), (int(end_x), int(end_y)), 2)
         pygame.draw.rect(screen, (255, 0, 0), (bar_x, bar_y, fill, bar_height))  # rdeče polnilo
         pygame.draw.rect(screen, (255, 255, 255), (bar_x, bar_y, bar_width, bar_height), 1)  # bel okvir
         

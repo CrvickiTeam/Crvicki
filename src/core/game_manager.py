@@ -46,8 +46,8 @@ class GameManager:
         # For simplicity, still hardcoding 2 players for now, but showing where to use player_count
         # Actual player creation logic would need to adapt if player_count > 2
 
-        player1 = Player(player1_start_pos, PlayerTeam.TEAM_1, self.config)
-        player2 = Player(player2_start_pos, PlayerTeam.TEAM_2, self.config)
+        player1 = Player(player1_start_pos, PlayerTeam.TEAM_1, self.config, self)
+        player2 = Player(player2_start_pos, PlayerTeam.TEAM_2, self.config, self)
         self.players.append(player1)
         self.players.append(player2)
 
