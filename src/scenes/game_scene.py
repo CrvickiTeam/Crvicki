@@ -29,21 +29,28 @@ class GameScene(Scene):
     def update(self, dt: float) -> None:
         keys = pygame.key.get_pressed()
         active_player = self.game_controller.get_active_player()
-        if active_player:
-            if keys[pygame.K_a]:
-                active_player.move_left()
-            if keys[pygame.K_d]:
-                active_player.move_right()
 
-            if keys[pygame.K_LEFT]:
-                active_player.aim_up(dt)
-            if keys[pygame.K_RIGHT]:
-                active_player.aim_down(dt)
-            if keys[pygame.K_DOWN]:
-                active_player.decrease_power(dt)
-            if keys[pygame.K_UP]:
-                active_player.increase_power(dt)
-        self.game_controller.update(dt)
+        if self.game_controller.running and active_player: # Check if game is running and player is active
+            if not self.game_controller.active_weapon: # Only allow player input if no weapon is active
+                if keys[pygame.K_a]:
+                    active_player.move_left()
+                if keys[pygame.K_d]:
+                    active_player.move_right()
+
+                if keys[pygame.K_LEFT]: # Aiming keys
+                    active_player.aim_up(dt)
+                if keys[pygame.K_RIGHT]:
+                    active_player.aim_down(dt)
+                if keys[pygame.K_DOWN]:
+                    active_player.decrease_power(dt)
+                if keys[pygame.K_UP]:
+                    active_player.increase_power(dt)
+        
+        game_status = self.game_controller.update(dt)
+
+        if game_status == "GAME_OVER":
+            print("GameScene: Detected GAME_OVER, switching to MAIN_MENU.")
+            self.manager.switch_scene("MAIN_MENU")
 
     def draw(self, screen: pygame.Surface) -> None:
         screen.fill((100, 160, 255))
