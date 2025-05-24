@@ -18,7 +18,7 @@ class GameScene(Scene):
         active_player = self.game_controller.get_active_player()
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_ESCAPE:
-                self.manager.switch_scene("MAIN_MENU")
+                self.manager.switch_scene("PAUSE_MENU")
             elif event.key == pygame.K_TAB:
                 self.game_controller.next_turn()
             elif event.key == pygame.K_SPACE:
