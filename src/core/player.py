@@ -164,10 +164,10 @@ class Player:
     def aim_down(self, dt: float):
         if self.direction == 1: # Facing right
             self.aim_angle -= self.aim_angle_rate * dt # Use instance attribute
-            self.aim_angle = max(self.aim_angle, -90.0)
+            self.aim_angle = max(self.aim_angle, 0.0)
         else: # Facing left
             self.aim_angle += self.aim_angle_rate * dt # Use instance attribute
-            self.aim_angle = min(self.aim_angle, 270.0)
+            self.aim_angle = min(self.aim_angle, 180.0)
 
     def increase_power(self, dt: float):
         self.aim_power += self.aim_power_rate * dt # Use instance attribute
@@ -254,92 +254,89 @@ class Player:
             return
 
         is_active_player = (self.game_manager.get_active_player() == self)
-        current_tank_image_orig = self.active_tank_image_orig if is_active_player else self.waiting_tank_image_orig
 
-        # --- Risanje tanka ---
-        if current_tank_image_orig:
-            rotated_tank_image = pygame.transform.rotate(current_tank_image_orig, self.angle)
-            tank_rect = rotated_tank_image.get_rect(center=(int(self.x), int(self.y)))
-            screen.blit(rotated_tank_image, tank_rect.topleft)
+        # === 1. PRIPRAVA SLIKE TANKA ===
+        base_tank_sprite = self.active_tank_image_orig if is_active_player else self.waiting_tank_image_orig
+        if base_tank_sprite:
+            tank_surface_to_render = pygame.transform.flip(base_tank_sprite, True,
+                                                           False) if self.direction == -1 else base_tank_sprite
+            rotated_tank_surface = pygame.transform.rotate(tank_surface_to_render, self.angle)
+            tank_render_rect = rotated_tank_surface.get_rect(center=(int(self.x), int(self.y)))
+            screen.blit(rotated_tank_surface, tank_render_rect.topleft)
         else:
-            # Fallback: nariši hitbox, če slike ni (originalna logika hitboxa)
+            # Rezervni način prikaza (hitbox kot pravokotnik)
             half_w, half_h = self.width / 2, self.height / 2
             points = [(-half_w, -half_h), (half_w, -half_h), (half_w, half_h), (-half_w, half_h)]
-            angle_rad_body = math.radians(self.angle);
-            cos_a, sin_a = math.cos(angle_rad_body), math.sin(angle_rad_body)
-            rotated_points = []
-            for px, py in points:
-                x_rot = px * cos_a - py * sin_a;
-                y_rot = px * sin_a + py * cos_a
-                rotated_points.append((int(self.x + x_rot), int(self.y + y_rot)))
+            angle_rad = math.radians(self.angle)
+            cos_a, sin_a = math.cos(angle_rad), math.sin(angle_rad)
+            rotated_points = [
+                (int(self.x + px * cos_a - py * sin_a), int(self.y + px * sin_a + py * cos_a))
+                for px, py in points
+            ]
             hitbox_color = (255, 0, 0) if self.team == PlayerTeam.TEAM_1 else (0, 0, 255)
             pygame.draw.polygon(screen, hitbox_color, rotated_points, 1)
-            center_color = (255, 255, 0);
-            pygame.draw.circle(screen, center_color, (int(self.x), int(self.y)), 3)
+            pygame.draw.circle(screen, (255, 255, 0), (int(self.x), int(self.y)), 3)
 
-        # --- Risanje cevi (samo za aktivnega igralca in če slika cevi obstaja) ---
-        aim_rad_for_pipe_indicator = math.radians(self.aim_angle)  # Shranimo za kasneje
-        pipe_display_angle = -self.aim_angle  # Pygame rotira v nasprotni smeri urinega kazalca,
-        # zato negiramo matematični kot za pravilen prikaz
+        # === 2. CEV IN INDIKATOR (samo za aktivnega igralca) ===
+        if not is_active_player:
+            return
 
-        if is_active_player and self.pipe_image_orig:
-            rotated_pipe_image = pygame.transform.rotate(self.pipe_image_orig, pipe_display_angle)
+        # A. Izračun sidrišča cevi
+        anchor_x, anchor_y = self.x, self.y
+        if self.active_tank_image_orig:
+            local_anchor_x, local_anchor_y = 20, 22
+            offset_x = local_anchor_x - self.active_tank_image_orig.get_width() / 2
+            offset_y = local_anchor_y - self.active_tank_image_orig.get_height() / 2
 
-            pipe_attach_offset_y_local = -self.height * 0.15
+            if self.direction == -1:
+                offset_x *= -1
 
-            angle_rad_body = math.radians(self.angle)
-            cos_a_body = math.cos(angle_rad_body)
-            sin_a_body = math.sin(angle_rad_body)
+            body_angle_rad = math.radians(self.angle)
+            rotated_offset_x = offset_x * math.cos(body_angle_rad) - offset_y * math.sin(body_angle_rad)
+            rotated_offset_y = offset_x * math.sin(body_angle_rad) + offset_y * math.cos(body_angle_rad)
+            anchor_x += rotated_offset_x
+            anchor_y += rotated_offset_y
 
-            rotated_attach_offset_x = -pipe_attach_offset_y_local * sin_a_body
-            rotated_attach_offset_y = pipe_attach_offset_y_local * cos_a_body
+        # B. Izris cevi
+        if self.pipe_image_orig:
+            pipe_pivot_x, pipe_pivot_y = 20, 22
+            image_to_rotate = self.pipe_image_orig
+            pivot_x_on_image = pipe_pivot_x
 
-            pipe_mount_point_x = self.x + rotated_attach_offset_x
-            pipe_mount_point_y = self.y + rotated_attach_offset_y
+            if self.direction == -1:
+                image_to_rotate = pygame.transform.flip(image_to_rotate, True, False)
+                pivot_x_on_image = image_to_rotate.get_width() - pipe_pivot_x
 
-            pipe_center_to_connector_offset_x = -self.pipe_image_orig.get_width() / 2.0
+            # Rotacija slike
+            pygame_rotation_angle = -self.aim_angle
+            vector_rotation_angle = self.aim_angle
 
-            # Rotiramo ta odmik z `pipe_display_angle`
-            cos_display_pipe = math.cos(math.radians(pipe_display_angle))
-            sin_display_pipe = math.sin(math.radians(pipe_display_angle))
+            image_rect = image_to_rotate.get_rect()
+            pivot_vec = pygame.math.Vector2(pivot_x_on_image - image_rect.centerx,
+                                            pipe_pivot_y - image_rect.centery)
+            rotated_image = pygame.transform.rotate(image_to_rotate, pygame_rotation_angle)
+            rotated_rect = rotated_image.get_rect()
+            rotated_pivot_vec = pivot_vec.rotate(-vector_rotation_angle)
 
-            actual_connector_offset_x = pipe_center_to_connector_offset_x * cos_display_pipe  # Y komponenta ni potrebna, ker je offset samo po X
-            actual_connector_offset_y = pipe_center_to_connector_offset_x * sin_display_pipe
+            rotated_rect.center = (anchor_x - rotated_pivot_vec.x, anchor_y - rotated_pivot_vec.y)
+            screen.blit(rotated_image, rotated_rect.topleft)
 
-            target_pipe_center_x = pipe_mount_point_x - actual_connector_offset_x
-            target_pipe_center_y = pipe_mount_point_y - actual_connector_offset_y
-
-            pipe_rect = rotated_pipe_image.get_rect(center=(int(target_pipe_center_x), int(target_pipe_center_y)))
-            screen.blit(rotated_pipe_image, pipe_rect.topleft)
-
-            # --- Risanje indikatorja za ciljanje (črta iz konca cevi) ---
-            # Uporabimo aim_rad_for_pipe_indicator (matematični kot)
-            cos_aim_math = math.cos(aim_rad_for_pipe_indicator)
-            sin_aim_math = math.sin(aim_rad_for_pipe_indicator)
-
-            pipe_center_to_tip_offset_x = self.pipe_image_orig.get_width() / 2.0
-
-            # Odmik konice cevi od njenega centra, rotiran z `pipe_display_angle` za pravilen prikaz
-            actual_tip_offset_x_display = pipe_center_to_tip_offset_x * cos_display_pipe
-            actual_tip_offset_y_display = pipe_center_to_tip_offset_x * sin_display_pipe
-
-            line_start_x = target_pipe_center_x + actual_tip_offset_x_display
-            line_start_y = target_pipe_center_y + actual_tip_offset_y_display
-
-            line_length = (self.aim_power / self.max_aim_power) * 30
-
-            # Za konec črte uporabimo matematični kot, ker želimo smer ciljanja
-            line_end_x = line_start_x + line_length * cos_aim_math
-            line_end_y = line_start_y - line_length * sin_aim_math  # Minus, ker Y os Pygame kaže navzdol
-
-            pygame.draw.line(screen, (255, 255, 255), (int(line_start_x), int(line_start_y)),
-                             (int(line_end_x), int(line_end_y)), 2)
-        elif is_active_player:  # Če ni slike cevi, ampak je aktiven, nariši originalno črto ciljanja
+        # C. Izris belega indikatorja moči strela
+        start_x, start_y = anchor_x, anchor_y
+        if self.pipe_image_orig:
+            dist_pivot_to_tip = self.pipe_image_orig.get_width() - 20
             aim_rad = math.radians(self.aim_angle)
-            line_length = (self.aim_power / self.max_aim_power) * 50
-            end_x = self.x + line_length * math.cos(aim_rad)
-            end_y = self.y - line_length * math.sin(aim_rad)  # -sin(aim_rad) ker y raste navzdol
-            pygame.draw.line(screen, (255, 255, 255), (int(self.x), int(self.y)), (int(end_x), int(end_y)), 2)
+            tip_offset_x = dist_pivot_to_tip * math.cos(aim_rad)
+            tip_offset_y = -dist_pivot_to_tip * math.sin(aim_rad)
+            start_x += tip_offset_x
+            start_y += tip_offset_y
+
+        aim_rad = math.radians(self.aim_angle)
+        line_length = (self.aim_power / self.max_aim_power) * 50
+        end_x = start_x + line_length * math.cos(aim_rad)
+        end_y = start_y - line_length * math.sin(aim_rad)
+
+        pygame.draw.line(screen, (255, 255, 255), (int(start_x), int(start_y)), (int(end_x), int(end_y)), 2)
 
         # Draw health bar
         bar_width = 40
