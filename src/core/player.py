@@ -257,6 +257,10 @@ class Player:
 
         # === 1. PRIPRAVA SLIKE TANKA ===
         base_tank_sprite = self.active_tank_image_orig if is_active_player else self.waiting_tank_image_orig
+
+        pipe_anchor_on_screen_x = self.x  # Privzeto, če spodnji izračun ne uspe
+        pipe_anchor_on_screen_y = self.y
+
         if base_tank_sprite:
             tank_surface_to_render = pygame.transform.flip(base_tank_sprite, True,
                                                            False) if self.direction == -1 else base_tank_sprite
@@ -308,7 +312,7 @@ class Player:
                 pivot_x_on_image = image_to_rotate.get_width() - pipe_pivot_x
 
             # Rotacija slike
-            pygame_rotation_angle = -self.aim_angle
+            pygame_rotation_angle = self.aim_angle
             vector_rotation_angle = self.aim_angle
 
             image_rect = image_to_rotate.get_rect()
