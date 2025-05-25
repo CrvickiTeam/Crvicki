@@ -310,7 +310,7 @@ class Player:
             if self.direction == -1:
                 image_to_rotate = pygame.transform.flip(image_to_rotate, True, False)
                 pivot_x_on_image = image_to_rotate.get_width() - pipe_pivot_x
-
+            
             # Rotacija slike
             pygame_rotation_angle = self.aim_angle
             vector_rotation_angle = self.aim_angle
@@ -324,6 +324,8 @@ class Player:
 
             rotated_rect.center = (anchor_x - rotated_pivot_vec.x, anchor_y - rotated_pivot_vec.y)
             screen.blit(rotated_image, rotated_rect.topleft)
+
+
 
         # C. Izris belega indikatorja moči strela
         start_x, start_y = anchor_x, anchor_y
