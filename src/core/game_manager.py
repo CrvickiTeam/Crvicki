@@ -97,6 +97,7 @@ class GameManager:
     def is_game_over(self) -> bool:
         if not self.players:
             self.winner_team = None
+            self.config['game_result'] = {'winner_team': None} # Store result
             return False # No players, game can't be over in a typical sense yet
 
         alive_players = [p for p in self.players if p.alive]
@@ -104,10 +105,12 @@ class GameManager:
 
         if len(self.players) == 0 : # Should not happen if game started
             self.winner_team = None
+            self.config['game_result'] = {'winner_team': None} # Store result
             return False
         if len(self.players) == 1: # Single player mode (if ever implemented)
             if num_alive_players == 0:
                 self.winner_team = None # Or potentially a "draw" or "loss" state
+                self.config['game_result'] = {'winner_team': None} # Store result
                 return True
             # If single player is alive, game is not over yet for them.
             return False
@@ -121,8 +124,10 @@ class GameManager:
             else:
                 self.winner_team = None # No winner if all die simultaneously
                 print("Game Over! No players left alive.")
+                self.config['game_result'] = {'winner_team': self.winner_team} # Store result
             return True
         self.winner_team = None
+        self.config['game_result'] = {'winner_team': None} # Game not over, no winner yet
         return False
 
     def update(self, dt: float) -> Optional[str]: 

@@ -5,6 +5,7 @@ from scenes.scene import Scene
 from scenes.main_menu_scene import MainMenuScene
 from scenes.game_scene import GameScene
 from scenes.pause_menu_scene import PauseMenuScene
+from scenes.win_menu_scene import WinMenuScene
 from core.terrain import TerrainMap
 
 from typing import Dict, Any, TYPE_CHECKING
@@ -29,6 +30,7 @@ class SceneManager:
             "MAIN_MENU": MainMenuScene(self, config),
             "GAME": GameScene(self, config),
             "PAUSE_MENU": PauseMenuScene(self, config),
+            "WIN_MENU": WinMenuScene(self, config),
         }
         if initial_scene_name not in self.scenes:
             raise ValueError(f"Initial scene '{initial_scene_name}' not found.")
@@ -76,11 +78,13 @@ class SceneManager:
     def update_active_scene(self, dt: float) -> None:
         # Update logic based on current scene and pause state
         if self.active_scene_key == "GAME":
-            if not self.game_paused_by_menu:
+            if not self.game_paused_by_menu: # Game logic updates if not paused
                 self.scenes["GAME"].update(dt)
-            # If paused, GAME scene logic does not update
+            # If game is over (WIN_MENU active), game_controller.running is False, so GAME update is minimal.
         elif self.active_scene_key == "PAUSE_MENU":
-            self.scenes["PAUSE_MENU"].update(dt) # Pause menu updates its own state (e.g., button hover)
+            self.scenes["PAUSE_MENU"].update(dt) # Pause menu updates its own state
+        elif self.active_scene_key == "WIN_MENU":
+            self.scenes["WIN_MENU"].update(dt) # Win menu updates its own state (e.g., button hover)
         else: # For other scenes like MAIN_MENU
             self.active_scene.update(dt)
 
@@ -88,6 +92,9 @@ class SceneManager:
         if self.active_scene_key == "PAUSE_MENU":
             self.scenes["GAME"].draw(self.screen)      # Draw the underlying game screen (frozen)
             self.scenes["PAUSE_MENU"].draw(self.screen) # Draw the pause menu on top
+        elif self.active_scene_key == "WIN_MENU": 
+            self.scenes["GAME"].draw(self.screen)      # Draw the underlying game screen (frozen)
+            self.scenes["WIN_MENU"].draw(self.screen) # Draw the win menu on top
         else:
             # For GAME, MAIN_MENU, etc., they handle their own full draw, including background
             self.active_scene.draw(self.screen)
