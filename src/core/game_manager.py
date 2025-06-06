@@ -1,17 +1,14 @@
 import pygame
-import numpy as np 
-import math
+import numpy as np # Ensure numpy is imported
 from typing import Dict, Any, Tuple, List, Optional
 
-from .terrain import Terrain, TerrainMap
-from .player import Player, PlayerTeam # Player class will now handle its own movement limits
+from .terrain import Terrain, TerrainMap # Assuming TerrainMap might be used elsewhere
+from .player import Player, PlayerTeam 
 from .weapons.weapon import Weapon
 from .weapons.basic_cannon import BasicCannon
-# from enum import Enum, auto # auto might not be needed if TurnStage is the only user
-
-# class TurnStage(Enum): # REMOVE THIS ENUM
-#     MOVING = auto()
-#     AIMING = auto()
+# from .weapons.sniper_rifle import SniperRifle # Future weapon
+# from .weapons.big_bomb_cannon import BigBombCannon # Future weapon
+# from .weapons.cluster_gun import ClusterGun # Future weapon
 
 
 class GameManager:
@@ -234,47 +231,62 @@ class GameManager:
         return None 
 
     def process_impact_effect(self, impact_data: Dict[str, Any]) -> None:
-        if not self.running: return
-
-        # print(f"GameManager processing impact: {impact_data}") # Keep for debugging if needed
+        if not self.running or not impact_data:
+            return
         
-        terrain_gradient_array: Optional[np.ndarray] = impact_data.get('terrain_gradient')
-        terrain_gradient_offset: Optional[Tuple[int, int]] = impact_data.get('terrain_gradient_offset') 
+        effect_gradient_array: Optional[np.ndarray] = impact_data.get('effect_gradient')
+        gradient_origin_offset: Optional[Tuple[int, int]] = impact_data.get('gradient_origin') 
         
-        if self.terrain and terrain_gradient_array is not None and terrain_gradient_offset is not None:
-            if terrain_gradient_array.size > 0:
-                self.terrain.destroy_terrain(terrain_gradient_offset, terrain_gradient_array)
+        # --- Terrain Destruction ---
+        if self.terrain and effect_gradient_array is not None and gradient_origin_offset is not None:
+            if effect_gradient_array.size > 0:
+                # Assuming Terrain class has a method like destroy_terrain or apply_gradient
+                # Based on your player.py, terrain likely has a similar method or direct grid manipulation
+                self.terrain.destroy_terrain(gradient_origin_offset, effect_gradient_array)
         
-        if terrain_gradient_array is not None and terrain_gradient_offset is not None and terrain_gradient_array.size > 0:
+        # --- Player Damage ---
+        # Player.process_explosion_damage will be called for each player
+        if effect_gradient_array is not None and gradient_origin_offset is not None and effect_gradient_array.size > 0:
+            owner_player: Optional[Player] = impact_data.get('owner')
             for player in self.players:
-                if player.alive:
-                    player.process_explosion_damage(terrain_gradient_offset, terrain_gradient_array)
-        elif impact_data.get('damage_values'): 
-             damage_values: List[Tuple[Player, int]] = impact_data.get('damage_values', [])
-             for player_instance, damage_amount in damage_values:
-                if player_instance.alive and damage_amount > 0:
-                    player_instance.apply_damage(damage_amount)
+                if player.alive: # Ensure player is alive before processing damage
+                    # Player class has process_explosion_damage which internally calls apply_damage
+                    player.process_explosion_damage(gradient_origin_offset, effect_gradient_array)
+        
+        # This section for 'damage_values' was an alternative system.
+        # Based on your player.py, the process_explosion_damage method is the primary way players take damage from explosions.
+        # If 'damage_values' is a separate mechanic (e.g., direct damage not from a gradient),
+        # it should be handled distinctly.
+        # For now, assuming explosion damage is handled by player.process_explosion_damage.
+        # The 'elif' for 'damage_values' is removed to avoid confusion if it's not currently used
+        # or if its intent was covered by the gradient system.
+        # If 'damage_values' represents a different type of damage (e.g. poison, direct non-explosive hit),
+        # then it would need its own clear logic.
+        # Given the context of explosions, the gradient processing is the primary path.
 
     def execute_player_action(self, weapon_type_id: str, angle: float, power: float) -> None:
         if self.active_weapon:
-            print("Cannot fire: Weapon effect already in progress.")
+            # print("Cannot fire: Weapon effect already in progress.") # Optional: keep for debugging
             return
-
-        # if self.current_turn_stage != TurnStage.AIMING: # REMOVE STAGE CHECK
-        #     print("Cannot fire: Not in aiming stage.")
-        #     return
 
         active_player = self.get_active_player()
         if not active_player:
-            print("Cannot execute action: No active player.")
+            # print("Cannot execute action: No active player.") # Optional: keep for debugging
             return
 
-        print(f"Player {self.current_player_index} ({active_player.team.name}) executing action with {weapon_type_id}!")
-        print(f"  Angle: {angle:.2f} degrees, Power: {power:.2f}")
+        # print(f"Player {self.current_player_index} ({active_player.team.name}) executing action with {weapon_type_id}!")
+        # print(f"  Angle: {angle:.2f} degrees, Power: {power:.2f}")
 
         weapon_instance: Optional[Weapon] = None
         if weapon_type_id == "basic_cannon": 
             weapon_instance = BasicCannon(owner=active_player, game_manager=self) 
+        # Add other weapon types here later:
+        # elif weapon_type_id == "sniper_rifle":
+        #     weapon_instance = SniperRifle(owner=active_player, game_manager=self)
+        # elif weapon_type_id == "big_bomb_cannon":
+        #     weapon_instance = BigBombCannon(owner=active_player, game_manager=self)
+        # elif weapon_type_id == "cluster_gun":
+        #     weapon_instance = ClusterGun(owner=active_player, game_manager=self)
         else:
             print(f"Error: Unknown weapon type ID '{weapon_type_id}'. Cannot create weapon instance.")
             return 
@@ -282,7 +294,7 @@ class GameManager:
         if weapon_instance:
             weapon_instance.activate(angle, power)
             self.active_weapon = weapon_instance
-        
+    
     def draw_components(self, screen: pygame.Surface) -> None:
         if self.terrain: self.terrain.draw(screen)
         

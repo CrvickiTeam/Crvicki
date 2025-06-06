@@ -64,6 +64,13 @@
         },
         "weapons": {
             "defaults": {
+                "power_to_velocity_scale": 5.0,
+                "projectile_gravity": 400.0,
+                "projectile_draw_size_radius": 5
+            },
+            "basic_cannon": {
+                "explosion_radius": 30,
+                "center_damage": 50,
                 "power_to_velocity_scale": 5.0
             }
         },

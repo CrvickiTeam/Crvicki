@@ -3,7 +3,7 @@ import math
 from typing import TYPE_CHECKING, Tuple
 
 from .weapon import Weapon 
-from ..projectiles.basic_projectile import BasicProjectile 
+from ..projectiles.basic_projectile import BasicProjectile # Or just Projectile if BasicProjectile is very simple
 
 if TYPE_CHECKING:
     from ..player import Player
@@ -18,16 +18,29 @@ class BasicCannon(Weapon):
 
     def __init__(self, owner: 'Player', game_manager: 'GameManager'):
         super().__init__(owner, game_manager) # game_manager is passed to base
+        
+        # Load BasicCannon specific config
+        # Example: self.game_manager.config['game']['weapons']['basic_cannon']
+        cannon_cfg_path = ["game", "weapons", "basic_cannon"] 
+        current_config_level = self.game_manager.config
+        for key in cannon_cfg_path:
+            current_config_level = current_config_level.get(key, {})
+        
+        # Default values if not found in config
+        self.explosion_radius_val: int = int(current_config_level.get("explosion_radius", 30))
+        self.center_damage_val: int = int(current_config_level.get("center_damage", 50))
+        
+        # Override power_to_velocity_scale if specified for this specific weapon type
+        # The base Weapon.__init__ already loads a default power_to_velocity_scale.
+        # This allows specific weapons to have their own.
+        if "power_to_velocity_scale" in current_config_level:
+             self.power_to_velocity_scale = float(current_config_level["power_to_velocity_scale"])
+
 
     def activate(self, angle: float, power: float):
         super().activate(angle, power) # Call base to reset projectiles and _is_finished
 
-        # The check below is now mostly redundant if super().activate() is called,
-        # as _is_finished would be False and projectiles empty.
-        # Keeping it if you have specific logic where it might still be relevant.
-        if self._is_finished or self.projectiles: 
-            # This path should ideally not be taken if super().activate() was just called.
-            # print("BasicCannon: Attempted to activate when already finished or has projectiles (after super call).")
+        if self._is_finished: 
             return
 
         angle_rad = math.radians(angle)
@@ -35,16 +48,16 @@ class BasicCannon(Weapon):
         initial_vx = velocity_magnitude * math.cos(angle_rad)
         initial_vy = -velocity_magnitude * math.sin(angle_rad)
 
-        start_x = self.owner.x 
-        start_y = self.owner.y 
-        start_pos: Tuple[float, float] = (start_x, start_y)
+        start_pos: Tuple[float, float] = (self.owner.x, self.owner.y) 
 
-        projectile = BasicProjectile(
+        projectile = BasicProjectile( # Or just Projectile if BasicProjectile doesn't add much
             start_pos, 
             initial_vx, 
             initial_vy, 
             self.owner,
-            self.game_manager # <<< PASS self.game_manager
+            self.game_manager,
+            explosion_radius=self.explosion_radius_val, # Pass configured radius
+            center_damage=self.center_damage_val      # Pass configured damage
         )
         self.projectiles.append(projectile)
         # self._is_finished is already False due to super().activate()
