@@ -9,14 +9,13 @@ if TYPE_CHECKING:
     from ..player import Player
     from ..game_manager import GameManager
 
-# Power scaling factor (adjust as needed)
-# Maps the player's aim_power (e.g., 0-100) to initial velocity magnitude
-POWER_TO_VELOCITY_SCALE = 5
-
 class BasicCannon(Weapon):
     """
     A simple weapon that fires a single BasicProjectile.
     """
+    # If BasicCannon needed a *different* scale, you could override it here:
+    # POWER_TO_VELOCITY_SCALE = 0.8 # Example override
+
     def __init__(self, owner: 'Player', game_manager: 'GameManager'):
         super().__init__(owner, game_manager)
 
@@ -24,25 +23,23 @@ class BasicCannon(Weapon):
         """
         Launches a single BasicProjectile.
         """
-        if self._is_finished: # Prevent re-activation
+        if self._is_finished or self.projectiles: 
+            print("BasicCannon: Cannot activate, already finished or projectile active.")
             return
 
-        # Calculate initial velocity components
         angle_rad = math.radians(angle)
-        # Scale power to a suitable velocity magnitude
-        velocity_magnitude = power * POWER_TO_VELOCITY_SCALE
+        # Use the POWER_TO_VELOCITY_SCALE from the class (or instance if overridden)
+        velocity_magnitude = power * self.POWER_TO_VELOCITY_SCALE 
         initial_vx = velocity_magnitude * math.cos(angle_rad)
-        initial_vy = -velocity_magnitude * math.sin(angle_rad) # Negative because pygame y-axis is inverted
+        initial_vy = -velocity_magnitude * math.sin(angle_rad)
 
-        # Determine starting position (e.g., player's center)
-        # Could be offset later based on player sprite/weapon position
-        start_pos = (self.owner.x, self.owner.y)
+        start_x = self.owner.x 
+        start_y = self.owner.y - (self.owner.rect.height / 2) 
+        start_pos = (start_x, start_y)
 
-        # Create the projectile
         projectile = BasicProjectile(start_pos, initial_vx, initial_vy, self.owner)
-
-        # Add it to the list managed by this weapon instance
         self.projectiles.append(projectile)
+        self._is_finished = False
 
     # update() is inherited from Weapon
     # draw() is inherited from Weapon
