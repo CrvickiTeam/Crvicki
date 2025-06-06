@@ -41,7 +41,7 @@ class GameScene(Scene):
                     # elif self.game_controller.current_turn_stage == TurnStage.AIMING: # REMOVE
                     angle, power = active_player.get_shot_info()
                     # Use a default weapon ID or implement weapon selection
-                    self.game_controller.execute_player_action("big_bomb", angle, power)
+                    self.game_controller.execute_player_action("salvo", angle, power)
 
     def update(self, dt: float) -> None:
         keys: pygame.key.ScancodeWrapper = pygame.key.get_pressed() 

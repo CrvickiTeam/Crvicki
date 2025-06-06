@@ -7,8 +7,9 @@ from .player import Player, PlayerTeam
 from .weapons.weapon import Weapon
 # from .weapons.basic_cannon import BasicCannon
 from .weapons.small_bomb import SmallBomb
-from .weapons.big_bomb import BigBomb # <<< ADD THIS IMPORT
-# from .weapons.sniper_rifle import SniperRifle # Future weapon
+from .weapons.big_bomb import BigBomb
+from .weapons.sniper import Sniper
+from .weapons.salvo import Salvo # <<< ADD NEW IMPORT
 # from .weapons.big_bomb_cannon import BigBombCannon # Future weapon
 # from .weapons.cluster_gun import ClusterGun # Future weapon
 
@@ -282,11 +283,13 @@ class GameManager:
         weapon_instance: Optional[Weapon] = None
         if weapon_type_id == "small_bomb": 
             weapon_instance = SmallBomb(owner=active_player, game_manager=self)
-        elif weapon_type_id == "big_bomb": # <<< ADD THIS CASE
+        elif weapon_type_id == "big_bomb": 
             weapon_instance = BigBomb(owner=active_player, game_manager=self)
+        elif weapon_type_id == "sniper": 
+            weapon_instance = Sniper(owner=active_player, game_manager=self)
+        elif weapon_type_id == "salvo": # <<< NEW CHECK
+            weapon_instance = Salvo(owner=active_player, game_manager=self)
         # Add other weapon types here later:
-        # elif weapon_type_id == "sniper_rifle":
-        #     weapon_instance = SniperRifle(owner=active_player, game_manager=self)
         # elif weapon_type_id == "cluster_gun":
         #     weapon_instance = ClusterGun(owner=active_player, game_manager=self)
         else:
