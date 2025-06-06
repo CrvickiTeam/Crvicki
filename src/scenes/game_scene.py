@@ -55,14 +55,17 @@ class GameScene(Scene):
 
             active_player: Optional[Player] = self.game_controller.get_active_player()
             if active_player and not self.game_controller.active_weapon: 
-                # Player can always try to move and aim if it's their turn and no weapon is active.
-                # The Player class itself will handle movement limits (fuel).
                 
-                # Movement input
+                moved_this_frame_input = False # Track if A or D was pressed this frame
                 if keys[pygame.K_a]:
                     active_player.move_left()
+                    moved_this_frame_input = True
                 elif keys[pygame.K_d]: 
                     active_player.move_right()
+                    moved_this_frame_input = True
+                
+                if not moved_this_frame_input: # If neither A nor D is pressed
+                    active_player.stop_moving() # Tell the player to stop
                 
                 # Aiming input
                 if keys[pygame.K_LEFT]: active_player.aim_up(dt)

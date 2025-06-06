@@ -1,11 +1,11 @@
-from typing import TYPE_CHECKING, Tuple
+from typing import TYPE_CHECKING, Tuple, Optional, List, Dict, Any # Ensure all needed types are imported
 
 import pygame
 from enum import Enum
 import os
 import math
 import numpy as np
-from typing import TYPE_CHECKING
+# from typing import TYPE_CHECKING # Already imported above
 
 # Assuming Terrain and TerrainMaterial are importable if needed for type hints
 from .terrain import Terrain, TerrainMaterial # Make sure Terrain is imported
@@ -17,68 +17,60 @@ class PlayerTeam(Enum):
     TEAM_1 = 1
     TEAM_2 = 2
 
-# Removed global constants, they will be loaded from config or defaults set in __init__
-
 class Player:
-    def __init__(self, start_pos: tuple[int, int], team: PlayerTeam, config: dict,game_manager: 'GameManager') -> None:
-        self.config = config
-        self.team = team
-        self.game_manager = game_manager # Shrani referenco na GameManager
-        self.alive = True
-        self.health = 100
+    def __init__(self, start_pos: tuple[int, int], team: PlayerTeam, config: Dict[str, Any], game_manager: 'GameManager') -> None:
+        self.config: Dict[str, Any] = config
+        self.team: PlayerTeam = team
+        self.game_manager: 'GameManager' = game_manager 
+        self.alive: bool = True
+        
+        self.x: float = float(start_pos[0])
+        self.y: float = float(start_pos[1])
+        self.angle: float = 0.0
+        self.direction: int = 1 
 
-        self.x, self.y = float(start_pos[0]), float(start_pos[1])
-        self.angle = 0.0
-        self.direction = 1 # 1 for right, -1 for left
+        player_cfg: Dict[str, Any] = self.config.get("game", {}).get("player", {})
+        movement_cfg: Dict[str, Any] = player_cfg.get("movement", {})
+        hitbox_cfg: Dict[str, Any] = player_cfg.get("hitbox", {})
+        aiming_cfg: Dict[str, Any] = player_cfg.get("aiming", {})
 
-        # --- Load settings from config with defaults ---
-        player_cfg = self.config.get("game", {}).get("player", {})
-        movement_cfg = player_cfg.get("movement", {})
-        hitbox_cfg = player_cfg.get("hitbox", {})
-        aiming_cfg = player_cfg.get("aiming", {})
-        sprite_cfg = player_cfg.get("sprites", {})# Za prihodnjo uporabo
+        self.speed: float = float(movement_cfg.get("drive_speed", 100.0))
+        self.gravity: float = float(movement_cfg.get("gravity", 400.0))
+        self.max_step_height: int = int(movement_cfg.get("step_height", 5))
+        self.max_move_distance_per_turn: float = float(movement_cfg.get("max_move_distance_per_turn", 250.0)) 
+        self.health: int = int(player_cfg.get("max_health", 100))
 
-        # Use current global values as defaults if not found in config
-        self.speed = movement_cfg.get("drive_speed", 100)
-        self.gravity = movement_cfg.get("gravity", 400)
-        self.max_step_height = movement_cfg.get("step_height", 5)
-        self.max_move_distance_per_turn = movement_cfg.get("max_move_distance_per_turn", 100) # Distance player can move in one turn
+        self.width: int = int(hitbox_cfg.get("width", 20))
+        self.height: int = int(hitbox_cfg.get("height", 20))
 
-        self.width = hitbox_cfg.get("width", 20)
-        self.height = hitbox_cfg.get("height", 20)
+        self.aim_angle_rate: float = float(aiming_cfg.get("angle_change_rate", 60.0))
+        self.aim_power_rate: float = float(aiming_cfg.get("power_change_rate", 50.0))
+        self.min_aim_power: float = float(aiming_cfg.get("min_power", 10.0))
+        self.max_aim_power: float = float(aiming_cfg.get("max_power", 135.0))
+        self.default_aim_power: float = float(aiming_cfg.get("default_power", 50.0))
 
-        self.aim_angle_rate = aiming_cfg.get("angle_change_rate", 60)
-        self.aim_power_rate = aiming_cfg.get("power_change_rate", 50)
-        self.min_aim_power = aiming_cfg.get("min_power", 10)
-        self.max_aim_power = aiming_cfg.get("max_power", 135)
-        self.default_aim_power = aiming_cfg.get("default_power", 50)
-        # --- End loading settings ---
+        self.vx: float = 0.0
+        self.vy: float = 0.0
+        self.is_grounded: bool = False
+        self.is_moving: bool = False # Represents if player is *currently trying* to move via input
+        self.distance_moved_this_turn: float = 0.0 # Tracks fuel consumed
 
-        self.vx = 0.0
-        self.vy = 0.0
-        self.is_grounded = False
-        self.is_moving = False
-        self.distance_moved_this_turn = 0.0 # New attribute
+        self.aim_angle: float = 45.0 if self.direction == 1 else 135.0
+        self.aim_power: float = self.default_aim_power
 
-        # --- Aiming Attributes ---
-        self.aim_angle = 45.0 if self.direction == 1 else 135.0
-        self.aim_power = self.default_aim_power # Use loaded default
-
-        # --- Nalaganje slik ---
-        self.active_tank_image_orig: pygame.Surface | None = None
-        self.waiting_tank_image_orig: pygame.Surface | None = None
-        self.pipe_image_orig: pygame.Surface | None = None
+        self.active_tank_image_orig: Optional[pygame.Surface] = None
+        self.waiting_tank_image_orig: Optional[pygame.Surface] = None
+        self.pipe_image_orig: Optional[pygame.Surface] = None
         self.load_sprites()
 
-        # --- Prilagoditev širine/višine glede na naložene slike ali config ---
-        loaded_cfg_width = hitbox_cfg.get("width")
-        loaded_cfg_height = hitbox_cfg.get("height")
+        loaded_cfg_width: Optional[int] = hitbox_cfg.get("width")
+        loaded_cfg_height: Optional[int] = hitbox_cfg.get("height")
 
         if self.active_tank_image_orig:
-            base_img_w = self.active_tank_image_orig.get_width()
-            base_img_h = self.active_tank_image_orig.get_height()
+            base_img_w: int = self.active_tank_image_orig.get_width()
+            base_img_h: int = self.active_tank_image_orig.get_height()
 
-            if loaded_cfg_width and loaded_cfg_height:
+            if loaded_cfg_width is not None and loaded_cfg_height is not None:
                 self.width = loaded_cfg_width
                 self.height = loaded_cfg_height
                 self.active_tank_image_orig = pygame.transform.scale(self.active_tank_image_orig,
@@ -89,19 +81,21 @@ class Player:
             else:
                 self.width = base_img_w
                 self.height = base_img_h
-        elif loaded_cfg_width and loaded_cfg_height:
+        elif loaded_cfg_width is not None and loaded_cfg_height is not None:
             self.width = loaded_cfg_width
             self.height = loaded_cfg_height
 
-        self.rect = pygame.Rect(0, 0, self.width, self.height)
+        self.rect: pygame.Rect = pygame.Rect(0, 0, self.width, self.height)
         self.rect.center = (int(self.x), int(self.y))
 
-    def reset_turn_state(self):
-        """Resets player state at the beginning of their turn."""
+    def reset_turn_state(self) -> None:
+        """Resets player state at the beginning of their turn (e.g., movement fuel)."""
         self.distance_moved_this_turn = 0.0
-        # Potentially reset other per-turn states here
+        self.is_moving = False # Ensure movement intent is reset
+        self.vx = 0.0          # Ensure velocity is reset
+        # print(f"Player {self.team.name} turn state reset. Fuel remaining: {self.max_move_distance_per_turn - self.distance_moved_this_turn:.2f}")
 
-    def load_sprites(self):
+    def load_sprites(self) -> None:
         script_dir = os.path.dirname(__file__)
         project_root = os.path.abspath(os.path.join(script_dir, "..", ".."))
         base_path = os.path.join(project_root, "assets", "graphics", "characters")
@@ -141,26 +135,35 @@ class Player:
                                                           pygame.SRCALPHA)  # Zagotovi pozitivne dimenzije
                     self.pipe_image_orig.fill((255, 0, 255, 128))
 
-    def move_left(self):
-        self.vx = -self.speed # Use instance attribute
-        self.is_moving = True
-        if self.direction == 1:
-            self.direction = -1
-            self.aim_angle = 135.0 # Point up-left
+    def move_left(self) -> None:
+        """Sets the player's horizontal velocity to move left, if fuel is available."""
+        if self.distance_moved_this_turn < self.max_move_distance_per_turn:
+            self.vx = -self.speed
+            self.is_moving = True # Player is attempting to move
+            if self.direction == 1: # If facing right, turn left
+                self.direction = -1
+                self.aim_angle = 135.0 
+        else:
+            self.stop_moving() # No fuel left
 
-    def move_right(self):
-        self.vx = self.speed # Use instance attribute
-        self.is_moving = True
-        if self.direction == -1:
-            self.direction = 1
-            self.aim_angle = 45.0 # Point up-right
+    def move_right(self) -> None:
+        """Sets the player's horizontal velocity to move right, if fuel is available."""
+        if self.distance_moved_this_turn < self.max_move_distance_per_turn:
+            self.vx = self.speed
+            self.is_moving = True # Player is attempting to move
+            if self.direction == -1: # If facing left, turn right
+                self.direction = 1
+                self.aim_angle = 45.0
+        else:
+            self.stop_moving() # No fuel left
 
-    def stop_moving(self):
+    def stop_moving(self) -> None:
+        """Stops the player's horizontal movement."""
         self.vx = 0.0
-        self.is_moving = False
+        self.is_moving = False # Player is no longer attempting to move via input
 
     # --- Aiming Methods ---
-    def aim_up(self, dt: float):
+    def aim_up(self, dt: float) -> None:
         if self.direction == 1: # Facing right
             self.aim_angle += self.aim_angle_rate * dt # Use instance attribute
             self.aim_angle = min(self.aim_angle, 180.0)
@@ -168,7 +171,7 @@ class Player:
             self.aim_angle -= self.aim_angle_rate * dt # Use instance attribute
             self.aim_angle = max(self.aim_angle, 0.0)
 
-    def aim_down(self, dt: float):
+    def aim_down(self, dt: float) -> None:
         if self.direction == 1: # Facing right
             self.aim_angle -= self.aim_angle_rate * dt # Use instance attribute
             self.aim_angle = max(self.aim_angle, 0.0)
@@ -176,11 +179,11 @@ class Player:
             self.aim_angle += self.aim_angle_rate * dt # Use instance attribute
             self.aim_angle = min(self.aim_angle, 180.0)
 
-    def increase_power(self, dt: float):
+    def increase_power(self, dt: float) -> None:
         self.aim_power += self.aim_power_rate * dt # Use instance attribute
         self.aim_power = min(self.aim_power, self.max_aim_power) # Use instance attribute
 
-    def decrease_power(self, dt: float):
+    def decrease_power(self, dt: float) -> None:
         self.aim_power -= self.aim_power_rate * dt # Use instance attribute
         self.aim_power = max(self.aim_power, self.min_aim_power) # Use instance attribute
 
@@ -200,65 +203,205 @@ class Player:
         return np.any(grid_slice != TerrainMaterial.EMPTY.value)
 
     # --- Update ---
-    def update(self, dt: float, terrain: Terrain):
+    def update(self, dt: float, terrain: Terrain) -> None:
         if not self.alive or terrain is None: return
 
-        # Horizontal Movement
-        original_x = self.x # Store original x for distance calculation
-        if self.is_moving:
-            dx = self.vx * dt
-            target_x = self.x + dx
-            test_rect_x = self.rect.copy()
-            test_rect_x.center = (int(target_x), int(self.y))
-            blocked_by_boundary_x = False
-            if test_rect_x.left < 0: target_x = self.width / 2; self.vx = 0; blocked_by_boundary_x = True
-            elif test_rect_x.right > terrain.width: target_x = terrain.width - self.width / 2; self.vx = 0; blocked_by_boundary_x = True
-            test_rect_x.center = (int(target_x), int(self.y))
-            if not blocked_by_boundary_x and self._check_terrain_collision(test_rect_x, terrain):
-                stepped_up = False
-                for step in range(1, self.max_step_height + 1): # Use instance attribute
-                    test_rect_step = self.rect.copy(); test_rect_step.center = (int(target_x), int(self.y - step))
-                    if not self._check_terrain_collision(test_rect_step, terrain):
-                        self.x = target_x; self.y -= step; stepped_up = True; break
-                if not stepped_up: self.vx = 0; target_x = self.x
-            self.x = target_x
-            self.distance_moved_this_turn += abs(self.x - original_x) # Accumulate distance moved
+        x_at_start_of_frame_horizontal_phase: float = self.x # <<< INITIALIZE HERE
 
-        # Vertical Movement
-        if not self.is_grounded: self.vy += self.gravity * dt # Use instance attribute
-        dy = self.vy * dt
-        target_y = self.y + dy
-        test_rect_y = self.rect.copy(); test_rect_y.center = (int(self.x), int(target_y))
-        blocked_by_boundary_y = False
-        if test_rect_y.top < 0: target_y = self.height / 2; self.vy = 0; blocked_by_boundary_y = True
-        elif test_rect_y.bottom > terrain.height: target_y = terrain.height - self.height / 2; self.vy = 0; self.is_grounded = True; blocked_by_boundary_y = True
-        test_rect_y.center = (int(self.x), int(target_y))
-        if not blocked_by_boundary_y and self._check_terrain_collision(test_rect_y, terrain):
-            while self._check_terrain_collision(test_rect_y, terrain): test_rect_y.bottom -= 1; target_y = test_rect_y.centery
-            self.y = target_y; self.vy = 0; self.is_grounded = True
-            # Angle Calculation
-            center_x = int(self.x); ground_y = test_rect_y.bottom
-            left_x = max(0, center_x - self.width // 4); right_x = min(terrain.width - 1, center_x + self.width // 4)
-            left_y = ground_y; right_y = ground_y
-            for y_scan in range(ground_y - 1, ground_y + 5):
-                 if y_scan >= terrain.height: break
-                 # Use Enum value
-                 if terrain.logic_grid[left_x, y_scan] != TerrainMaterial.EMPTY.value: left_y = y_scan; break
-            for y_scan in range(ground_y - 1, ground_y + 5):
-                 if y_scan >= terrain.height: break
-                 # Use Enum value
-                 if terrain.logic_grid[right_x, y_scan] != TerrainMaterial.EMPTY.value: right_y = y_scan; break
-            delta_x_val = (right_x - left_x); delta_y_val = (right_y - left_y)
-            if delta_x_val != 0: self.angle = -math.degrees(math.atan2(delta_y_val, delta_x_val))
-            else: self.angle = 0.0
-        elif not blocked_by_boundary_y: self.y = target_y; self.is_grounded = False
-        elif blocked_by_boundary_y: self.y = target_y
+        # Horizontal Movement
+        if self.is_moving: # True if move_left/right was called and had fuel
+            potential_dx: float = self.vx * dt 
+            remaining_fuel: float = self.max_move_distance_per_turn - self.distance_moved_this_turn
+            
+            dx_to_apply_this_frame: float
+
+            if remaining_fuel <= 0:
+                dx_to_apply_this_frame = 0.0
+                self.stop_moving() # Ensure is_moving is false and vx is 0
+            elif abs(potential_dx) > remaining_fuel:
+                dx_to_apply_this_frame = math.copysign(remaining_fuel, potential_dx)
+            else:
+                dx_to_apply_this_frame = potential_dx
+            
+            if dx_to_apply_this_frame == 0.0 and self.vx != 0.0: # If intended to move but fuel cap resulted in no movement
+                self.stop_moving()
+
+            target_x: float = self.x + dx_to_apply_this_frame
+            
+            # --- Collision and application of horizontal movement ---
+            final_x_after_horizontal_pass: float = target_x # Start with fuel-adjusted target
+
+            test_rect_x: pygame.Rect = self.rect.copy()
+            test_rect_x.center = (int(final_x_after_horizontal_pass), int(self.y))
+            
+            blocked_by_boundary_x: bool = False
+            if test_rect_x.left < 0:
+                final_x_after_horizontal_pass = self.width / 2.0 
+                blocked_by_boundary_x = True
+            elif test_rect_x.right > terrain.width:
+                final_x_after_horizontal_pass = terrain.width - self.width / 2.0
+                blocked_by_boundary_x = True
+            
+            test_rect_x.center = (int(final_x_after_horizontal_pass), int(self.y))
+
+            original_y_before_step_attempt: float = self.y
+            if not blocked_by_boundary_x and self._check_terrain_collision(test_rect_x, terrain):
+                stepped_up: bool = False
+                for step in range(1, self.max_step_height + 1):
+                    test_rect_step: pygame.Rect = self.rect.copy()
+                    test_rect_step.center = (int(final_x_after_horizontal_pass), int(self.y - step))
+                    if not self._check_terrain_collision(test_rect_step, terrain):
+                        self.y -= step # Apply y change from stepping
+                        stepped_up = True
+                        self.is_grounded = True # Crucial: if we stepped up, we are on ground
+                        self.vy = 0             # Crucial: reset vertical velocity
+                        break 
+                if not stepped_up:
+                    final_x_after_horizontal_pass = x_at_start_of_frame_horizontal_phase # Cannot move, revert x
+                    self.y = original_y_before_step_attempt # Revert y if step attempt failed
+            
+            self.x = final_x_after_horizontal_pass
+            
+            # Update fuel consumed based on actual horizontal displacement this frame
+            # This line was the problem if self.is_moving was false initially:
+            actual_horizontal_displacement_this_frame: float = abs(self.x - x_at_start_of_frame_horizontal_phase)
+            self.distance_moved_this_turn += actual_horizontal_displacement_this_frame
+
+            if self.distance_moved_this_turn >= self.max_move_distance_per_turn:
+                self.distance_moved_this_turn = self.max_move_distance_per_turn # Cap it
+                if self.is_moving: # If was actively trying to move when fuel ran out
+                    self.stop_moving()
+        # else: # If not self.is_moving (e.g. input stopped, or fuel ran out on previous frame)
+            # self.vx = 0.0 # Ensure vx is 0 if not actively moving. stop_moving() handles this.
+            # The GameScene is responsible for calling move_left/right. If it doesn't, is_moving will become false
+            # after one frame if stop_moving() is called at the end of update or if fuel runs out.
+            # If GameScene stops calling move_left/right, self.is_moving might be true from last frame.
+            # The stop_moving() in move_left/right if fuel is out, and the one after distance_moved_this_turn update,
+            # are key. If GameScene doesn't call move_left/right, self.is_moving will be false from reset_turn_state
+            # or from previous frame's stop_moving().
+            pass
+
+
+        # Vertical Movement (Gravity)
+        # Assume self.is_grounded is from the PREVIOUS frame or from a step-up in THIS frame.
+        if not self.is_grounded:
+            self.vy += self.gravity * dt
+        else: # If grounded from previous frame/step-up, ensure vy is 0 before calculating dy
+            self.vy = 0 
+        
+        dy: float = self.vy * dt 
+        target_y_gravity: float = self.y + dy
+        
+        current_x_int = int(self.x) # Use the already resolved x for vertical checks
+
+        prospective_rect_y: pygame.Rect = self.rect.copy()
+        prospective_rect_y.centerx = current_x_int 
+        prospective_rect_y.centery = int(target_y_gravity)
+
+        new_is_grounded_this_frame = False # Re-evaluate grounded state based on this frame's vertical pass
+
+        # Boundary checks for y
+        if prospective_rect_y.top < 0: # Hit ceiling
+            prospective_rect_y.top = 0
+            self.y = float(prospective_rect_y.centery)
+            self.vy = 0 
+            new_is_grounded_this_frame = False # Hitting ceiling doesn't mean grounded
+        elif prospective_rect_y.bottom > terrain.height: # Hit bottom of world
+            prospective_rect_y.bottom = terrain.height
+            self.y = float(prospective_rect_y.centery)
+            self.vy = 0
+            new_is_grounded_this_frame = True
+        else:
+            # Terrain collision check for y
+            if self._check_terrain_collision(prospective_rect_y, terrain):
+                if dy >= 0: # Moving downwards or stationary and embedded -> Landed on something
+                    while self._check_terrain_collision(prospective_rect_y, terrain):
+                        prospective_rect_y.bottom -= 1
+                        if prospective_rect_y.top < -self.height * 2 : break # Safety break
+                    # After loop, prospective_rect_y.bottom is the y-coord of the first pixel *above* the ground.
+                    # So, the player's actual rect bottom should be this value.
+                    self.rect.bottom = prospective_rect_y.bottom + 1 # Place bottom on the surface
+                    self.y = float(self.rect.centery)
+                    self.vy = 0
+                    new_is_grounded_this_frame = True
+                elif dy < 0: # Moving upwards and hit something (like a platform from below)
+                    while self._check_terrain_collision(prospective_rect_y, terrain):
+                        prospective_rect_y.top += 1
+                        if prospective_rect_y.bottom > terrain.height + self.height*2 : break # Safety
+                    self.rect.top = prospective_rect_y.top -1 # Place top just below the surface hit
+                    self.y = float(self.rect.centery)
+                    self.vy = 0 
+                    new_is_grounded_this_frame = False # Hitting something from below is not grounded
+            else: # No collision with terrain at prospective_rect_y: potentially airborne
+                self.y = target_y_gravity # Apply the gravity move
+                
+                # "Sticky Feet" / Downward Probe: Check if ground is immediately below
+                # This helps prevent bobbing if player is 1px above ground due to float inaccuracies
+                # or small horizontal shifts.
+                if dy >= 0: # Only probe if moving down or was stationary (vy might have been 0)
+                    probe_rect = prospective_rect_y.copy() # Start from where player would be after gravity
+                    probe_rect.top += 1 # Move down 1 pixel to check for ground just beneath
+                    
+                    if self._check_terrain_collision(probe_rect, terrain):
+                        # Ground is 1 pixel below! Snap to it.
+                        while self._check_terrain_collision(probe_rect, terrain):
+                            probe_rect.bottom -= 1
+                            if probe_rect.top < -self.height * 2: break # Safety
+                        self.rect.bottom = probe_rect.bottom + 1
+                        self.y = float(self.rect.centery)
+                        self.vy = 0
+                        new_is_grounded_this_frame = True
+                    else:
+                        # Truly airborne
+                        new_is_grounded_this_frame = False
+                else: # Was moving upwards and didn't hit anything
+                    new_is_grounded_this_frame = False
+
+
+        self.is_grounded = new_is_grounded_this_frame
+
+        # Angle Calculation (based on final grounded position)
+        if self.is_grounded:
+            center_x_angle: int = int(self.x)
+            ground_y_contact_angle: int = int(self.y + self.height / 2.0) # Bottom of the player
+
+            left_x_angle: int = max(0, center_x_angle - self.width // 4)
+            right_x_angle: int = min(terrain.width - 1, center_x_angle + self.width // 4)
+            
+            left_y_angle: int = ground_y_contact_angle
+            right_y_angle: int = ground_y_contact_angle
+
+            scan_range_y_angle: int = self.max_step_height + 2 # How far to scan for ground
+
+            for y_scan_offset in range(-scan_range_y_angle, scan_range_y_angle):
+                y_check_left = min(terrain.height -1, max(0, ground_y_contact_angle + y_scan_offset))
+                if terrain.logic_grid[left_x_angle, y_check_left] != TerrainMaterial.EMPTY.value:
+                    left_y_angle = y_check_left
+                    break
+            for y_scan_offset in range(-scan_range_y_angle, scan_range_y_angle):
+                y_check_right = min(terrain.height -1, max(0, ground_y_contact_angle + y_scan_offset))
+                if terrain.logic_grid[right_x_angle, y_check_right] != TerrainMaterial.EMPTY.value:
+                    right_y_angle = y_check_right
+                    break
+            
+            delta_x_val_angle: int = (right_x_angle - left_x_angle)
+            delta_y_val_angle: int = (right_y_angle - left_y_angle)
+            if delta_x_val_angle != 0:
+                self.angle = -math.degrees(math.atan2(delta_y_val_angle, delta_x_val_angle))
+            else:
+                self.angle = 0.0
+        # else: # If not grounded, maintain current angle or set to 0
+            # self.angle = 0.0 # Optional: reset angle if airborne
 
         self.rect.center = (int(self.x), int(self.y))
-        self.stop_moving() # Stop horizontal movement after each update cycle?
+
+        # If GameScene is not calling move_left/right (keys released), is_moving will be false
+        # from the previous frame's stop_moving or from reset_turn_state.
+        # vx would be 0. So, no explicit stop_moving() needed at the very end of update here
+        # if the input handling in GameScene and fuel logic in Player are correct.
 
     # --- Draw ---
-    def draw(self, screen: pygame.Surface):
+    def draw(self, screen: pygame.Surface) -> None:
         if not self.alive:
             return
 
@@ -364,16 +507,16 @@ class Player:
         pygame.draw.rect(screen, (255, 0, 0), (bar_x, bar_y, fill, bar_height))  # rdeče polnilo
         pygame.draw.rect(screen, (255, 255, 255), (bar_x, bar_y, bar_width, bar_height), 1)  # bel okvir
         
-    def apply_damage(self, damage: int):
+    def apply_damage(self, damage: int) -> None:
         if not self.alive:
             return
         self.health -= damage
         if self.health <= 0:
             self.health = 0
             self.alive = False
-            print(f"Player from team {self.team.name} has died.")
+            self.game_manager.is_game_over()  # Check if game over condition is met
 
-    def process_explosion_damage(self, gradient_origin: Tuple[int, int], damage_gradient: np.ndarray):
+    def process_explosion_damage(self, gradient_origin: Tuple[int, int], damage_gradient: np.ndarray) -> None:
         """
         Calculates and applies damage to the player based on an explosion's damage gradient.
         Damage taken is the maximum value from the gradient that overlaps with the player's hitbox.
