@@ -47,6 +47,7 @@ class GameManager:
         
         game_settings = self.config.get('game_settings', {})
         player_count = game_settings.get('player_count', 2) # Default to 2 if not set
+        game_mode = game_settings.get('game_mode', "FFA") # Default to FFA
 
         # Common Y position for spawning players (they will fall to terrain)
         spawn_y = 150 
@@ -54,26 +55,8 @@ class GameManager:
         player_spawn_positions: List[Tuple[int, int]] = []
         player_teams: List[PlayerTeam] = []
 
-        if player_count == 3:
-            print("Starting a 3-player game.")
-            player_spawn_positions = [
-                (200, spawn_y),  # Player 1 (Left)
-                (self.terrain.width // 2, spawn_y),  # Player 2 (Middle)
-                (self.terrain.width - 200, spawn_y)  # Player 3 (Right)
-            ]
-            # In FFA, teams might just be for color/identification.
-            # P1: Team 1, P2: Team 2, P3: Team 1 (could be Team 2 or a new Team 3 if defined)
-            player_teams = [PlayerTeam.TEAM_1, PlayerTeam.TEAM_2, PlayerTeam.TEAM_1]
-        elif player_count == 2:
-            print("Starting a 2-player game.")
-            player_spawn_positions = [
-                (200, spawn_y),
-                (self.terrain.width - 200, spawn_y)
-            ]
-            player_teams = [PlayerTeam.TEAM_1, PlayerTeam.TEAM_2]
-        elif player_count == 4:
-            print("Starting a 4-player game.")
-            # Distribute players somewhat evenly, e.g., at 1/5, 2/5, 3/5, 4/5 of the width
+        if player_count == 4:
+            print(f"Starting a 4-player game. Mode: {game_mode}")
             base_offset = self.terrain.width // 5
             player_spawn_positions = [
                 (base_offset, spawn_y),            # Player 1
@@ -81,18 +64,36 @@ class GameManager:
                 (base_offset * 3, spawn_y),        # Player 3
                 (base_offset * 4, spawn_y)         # Player 4
             ]
-            # Assign teams, e.g., P1 & P3 vs P2 & P4 if teams were functional,
-            # or just for colors in FFA.
-            player_teams = [PlayerTeam.TEAM_1, PlayerTeam.TEAM_2, PlayerTeam.TEAM_1, PlayerTeam.TEAM_2]
-        else: # Fallback for other counts (e.g., 4 if not yet implemented, or invalid values)
-            print(f"Player count set to {player_count}. Defaulting to 2 players as specific logic is not met or count is unsupported.")
+            if game_mode == "TEAMS":
+                print("Assigning teams for 4-player TEAMS mode.")
+                # P1 & P3 (indices 0 & 2) vs P2 & P4 (indices 1 & 3)
+                player_teams = [PlayerTeam.TEAM_1, PlayerTeam.TEAM_2, PlayerTeam.TEAM_1, PlayerTeam.TEAM_2]
+            else: # FFA for 4 players
+                print("Assigning teams for 4-player FFA mode (cosmetic).")
+                player_teams = [PlayerTeam.TEAM_1, PlayerTeam.TEAM_2, PlayerTeam.TEAM_1, PlayerTeam.TEAM_2] # Or unique teams if desired for FFA colors
+        elif player_count == 3:
+            print("Starting a 3-player game (FFA).")
+            player_spawn_positions = [
+                (200, spawn_y),  # Player 1 (Left)
+                (self.terrain.width // 2, spawn_y),  # Player 2 (Middle)
+                (self.terrain.width - 200, spawn_y)  # Player 3 (Right)
+            ]
+            player_teams = [PlayerTeam.TEAM_1, PlayerTeam.TEAM_2, PlayerTeam.TEAM_1] # FFA cosmetic teams
+        elif player_count == 2:
+            print("Starting a 2-player game (FFA).")
+            player_spawn_positions = [
+                (200, spawn_y),
+                (self.terrain.width - 200, spawn_y)
+            ]
+            player_teams = [PlayerTeam.TEAM_1, PlayerTeam.TEAM_2] # FFA cosmetic teams
+        else: 
+            print(f"Player count set to {player_count}. Defaulting to 2 players as specific logic is not met or count is unsupported (FFA).")
             player_spawn_positions = [
                 (200, spawn_y),
                 (self.terrain.width - 200, spawn_y)
             ]
             player_teams = [PlayerTeam.TEAM_1, PlayerTeam.TEAM_2]
-            # Update player_count to actual number of players being created for consistency
-            player_count = 2 
+            player_count = 2 # Ensure consistency if defaulted
 
 
         for i in range(len(player_spawn_positions)):
@@ -153,50 +154,106 @@ class GameManager:
         if not self.players:
             self.winner_team = None
             self.winning_player = None
-            self.config['game_result'] = {'winner_team': None} # Store result
-            return False # No players, game can't be over in a typical sense yet
+            self.config['game_result'] = {'winner_team': None, 'winning_player_team': None}
+            return False
 
-        alive_players = [p for p in self.players if p.alive]
-        num_alive_players = len(alive_players)
+        game_settings = self.config.get('game_settings', {})
+        player_count_setting = game_settings.get('player_count', len(self.players))
+        game_mode_setting = game_settings.get('game_mode', "FFA")
 
-        if len(self.players) == 0 : # Should not happen if game started
+        is_team_mode_active = (player_count_setting == 4 and game_mode_setting == "TEAMS")
+
+        if is_team_mode_active:
+            team1_players = [p for p in self.players if p.team == PlayerTeam.TEAM_1]
+            team2_players = [p for p in self.players if p.team == PlayerTeam.TEAM_2]
+
+            # Ensure teams were actually formed (e.g. if player list is smaller than 4 but settings say 4 player teams)
+            if not team1_players and not team2_players: # No players assigned to any team, or no players at all
+                 self.winner_team = None
+                 self.winning_player = None
+                 print("Game Over! No players found in teams.")
+                 self.config['game_result'] = {'winner_team': None, 'winning_player_team': None}
+                 return True
+            
+            team1_alive = any(p.alive for p in team1_players) if team1_players else False
+            team2_alive = any(p.alive for p in team2_players) if team2_players else False
+
+            if team1_players and not team1_alive and team2_alive: # Team 1 eliminated, Team 2 wins
+                self.winner_team = PlayerTeam.TEAM_2
+                self.winning_player = None 
+                print(f"Game Over! Team {self.winner_team.name} is the winner!")
+                self.config['game_result'] = {'winner_team': self.winner_team.name, 'winning_player_team': None}
+                return True
+            elif team2_players and not team2_alive and team1_alive: # Team 2 eliminated, Team 1 wins
+                self.winner_team = PlayerTeam.TEAM_1
+                self.winning_player = None
+                print(f"Game Over! Team {self.winner_team.name} is the winner!")
+                self.config['game_result'] = {'winner_team': self.winner_team.name, 'winning_player_team': None}
+                return True
+            elif (team1_players and not team1_alive) and (team2_players and not team2_alive): # Both teams eliminated (draw)
+                self.winner_team = None
+                self.winning_player = None
+                print("Game Over! It's a Draw between teams!")
+                self.config['game_result'] = {'winner_team': None, 'winning_player_team': None}
+                return True
+            elif not team1_alive and not team2_alive and (not team1_players or not team2_players): # Edge case: one team might not have existed
+                self.winner_team = None
+                self.winning_player = None
+                print("Game Over! Draw or invalid team setup.")
+                self.config['game_result'] = {'winner_team': None, 'winning_player_team': None}
+                return True
+
+
+            # If game is not over yet for team mode
             self.winner_team = None
             self.winning_player = None
-            self.config['game_result'] = {'winner_team': None} # Store result
+            self.config['game_result'] = {'winner_team': None, 'winning_player_team': None}
             return False
-        if len(self.players) == 1: # Single player mode (if ever implemented)
-            if num_alive_players == 0:
-                self.winner_team = None # Or potentially a "draw" or "loss" state
+        else: # FFA logic (or any mode not 4-player TEAMS)
+            alive_players = [p for p in self.players if p.alive]
+            num_alive_players = len(alive_players)
+
+            if len(self.players) == 0:
+                self.winner_team = None
                 self.winning_player = None
-                self.config['game_result'] = {'winner_team': None} # Store result
+                self.config['game_result'] = {'winner_team': None, 'winning_player_team': None}
+                return False
+            
+            # For 1 player mode (if ever formally supported beyond testing)
+            if len(self.players) == 1:
+                if num_alive_players == 0: # The single player died
+                    self.winner_team = None 
+                    self.winning_player = None
+                    self.config['game_result'] = {'winner_team': None, 'winning_player_team': None}
+                    return True
+                self.winning_player = None # Game not over for the single player yet
+                return False
+
+
+            # Standard FFA: game is over if 1 or 0 players are left alive.
+            if num_alive_players <= 1:
+                if num_alive_players == 1:
+                    self.winning_player = alive_players[0]
+                    self.winner_team = self.winning_player.team # Store the team of the winning player
+                    try:
+                        winner_player_number = self.players.index(self.winning_player) + 1
+                        print(f"Game Over! Player {winner_player_number} (Team {self.winner_team.name}) is the winner!")
+                    except ValueError:
+                        print(f"Game Over! Team {self.winner_team.name} is the winner (player index not found)!")
+                else: # num_alive_players == 0
+                    self.winner_team = None 
+                    self.winning_player = None
+                    print("Game Over! No players left alive (Draw).")
+                self.config['game_result'] = {
+                    'winner_team': self.winner_team.name if self.winner_team else None, 
+                    'winning_player_team': self.winning_player.team.name if self.winning_player else None
+                }
                 return True
-            # If single player is alive, game is not over yet for them.
-            self.winning_player = None # Ensure it's clear no one has "won" yet in terms of game over
+            
+            self.winner_team = None 
+            self.winning_player = None 
+            self.config['game_result'] = {'winner_team': None, 'winning_player_team': None}
             return False
-
-
-        # For 2+ players (current FFA setup): game is over if 1 or 0 players are left alive.
-        if num_alive_players <= 1:
-            if num_alive_players == 1:
-                self.winning_player = alive_players[0]
-                self.winner_team = self.winning_player.team
-                # Determine player number for the print message
-                try:
-                    winner_player_number = self.players.index(self.winning_player) + 1
-                    print(f"Game Over! Player {winner_player_number} (Team {self.winner_team.name}) is the winner!")
-                except ValueError: # Should not happen
-                    print(f"Game Over! Team {self.winner_team.name} is the winner (player index not found)!")
-            else:
-                self.winner_team = None # No winner if all die simultaneously
-                self.winning_player = None
-                print("Game Over! No players left alive.")
-            self.config['game_result'] = {'winner_team': self.winner_team, 'winning_player_team': self.winning_player.team.name if self.winning_player else None} # Store result
-            return True
-        
-        self.winner_team = None # Game not over, no winner yet
-        self.winning_player = None # Game not over, no winning player yet
-        self.config['game_result'] = {'winner_team': None, 'winning_player_team': None} 
-        return False
 
     def update(self, dt: float) -> Optional[str]: 
         if not self.running:
