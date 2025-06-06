@@ -87,13 +87,26 @@ class WinMenuScene(Scene):
         screen.blit(self.overlay_surface, (0, 0))
 
         # Determine winner and set title
-        winner_team = self.manager.game_controller.get_winner_team()
-        if winner_team:
-            # Assuming PlayerTeam.TEAM_1.value is 1, PlayerTeam.TEAM_2.value is 2, etc.
-            title_string = f"Player {winner_team.value} Wins!"
+        winning_player = self.manager.game_controller.get_winning_player()
+
+        if winning_player:
+            try:
+                # Get the list of all players from the game controller
+                all_players = self.manager.game_controller.players
+                # Find the index of the winning player in that list
+                player_number = all_players.index(winning_player) + 1
+                title_string = f"Player {player_number} Wins!"
+            except ValueError:
+                # Fallback if player not found in list (should not happen)
+                # Or if team-based win display is ever needed without a specific player
+                winner_team = self.manager.game_controller.get_winner_team()
+                if winner_team:
+                    title_string = f"Team {winner_team.value} Wins!"
+                else:
+                    title_string = "Game Over!" # Should be caught by no winning_player
         else:
-            # Handle cases like a draw if no winner_team is set
-            title_string = "Game Over!" # Or "It's a Draw!"
+            # Handle cases like a draw if no winning_player is set
+            title_string = "It's a Draw!" # Or "Game Over!"
 
         self.title_text_surface = self.title_font.render(title_string, True, WHITE)
         self.title_text_rect = self.title_text_surface.get_rect(center=(self.screen_width // 2, self.screen_height // 2 - 100))
