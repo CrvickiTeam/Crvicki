@@ -3,7 +3,7 @@ import pygame
 
 from scenes.scene import Scene
 from scenes.main_menu_scene import MainMenuScene
-from scenes.game_scene import GameScene
+from scenes.game_scene import GameScene # Make sure GameScene is imported
 from scenes.pause_menu_scene import PauseMenuScene
 from scenes.win_menu_scene import WinMenuScene
 from core.terrain import TerrainMap
@@ -28,7 +28,7 @@ class SceneManager:
         self.game_controller = game_controller
         self.scenes: Dict[str, Scene] = {
             "MAIN_MENU": MainMenuScene(self, config),
-            "GAME": GameScene(self, config),
+            "GAME": GameScene(self, config), # GameScene is instantiated here
             "PAUSE_MENU": PauseMenuScene(self, config),
             "WIN_MENU": WinMenuScene(self, config),
         }
@@ -63,9 +63,13 @@ class SceneManager:
             else:
                 print("Warning: Can only pause from GAME scene.")
                 return # Don't switch if not in game
-        elif new_scene_key == "GAME": # Intending to go to Game scene (e.g. from Main Menu)
+        elif new_scene_key == "GAME": # Intending to go to Game scene (e.g. from Main Menu or Win Menu)
             self.active_scene = self.scenes["GAME"] # Set active scene before starting game
             self.game_controller.start_new_game(TerrainMap.FLAT)
+            # Reset GameScene specific states, like the timer
+            game_scene_instance = self.scenes.get("GAME")
+            if isinstance(game_scene_instance, GameScene): # Type check for safety
+                game_scene_instance.reset_timer() # Call the new reset method
             self.game_paused_by_menu = False
         elif new_scene_key == "MAIN_MENU":
             self.game_paused_by_menu = False # Reset pause state
