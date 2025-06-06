@@ -42,33 +42,49 @@ class GameManager:
         self.terrain = Terrain(map, self.config)
         self.players = []
         self.winner_team = None # Reset winner
-        # TODO: Get player count from config['game_settings']['player_count']
-        # For now, defaulting to 2 players
-        player1_start_pos = (200, 200) # These positions should be dynamic or from config
-        player2_start_pos = (self.terrain.width - 200, 200)
         
-        # Example: Use game_settings if available
         game_settings = self.config.get('game_settings', {})
         player_count = game_settings.get('player_count', 2) # Default to 2 if not set
 
-        # For simplicity, still hardcoding 2 players for now, but showing where to use player_count
-        # Actual player creation logic would need to adapt if player_count > 2
+        # Common Y position for spawning players (they will fall to terrain)
+        spawn_y = 150 
 
-        player1 = Player(player1_start_pos, PlayerTeam.TEAM_1, self.config, self)
-        player2 = Player(player2_start_pos, PlayerTeam.TEAM_2, self.config, self)
-        self.players.append(player1)
-        self.players.append(player2)
+        player_spawn_positions: List[Tuple[int, int]] = []
+        player_teams: List[PlayerTeam] = []
 
-        # Add more players based on player_count if logic is expanded
-        # if player_count >= 3:
-        #     player3_start_pos = (self.terrain.width // 2, 150)
-        #     player3 = Player(player3_start_pos, PlayerTeam.TEAM_1, self.config) # Or new team
-        #     self.players.append(player3)
-        # if player_count >= 4:
-        #     player4_start_pos = (self.terrain.width // 2 + 100, 150)
-        #     player4 = Player(player4_start_pos, PlayerTeam.TEAM_2, self.config) # Or new team
-        #     self.players.append(player4)
+        if player_count == 3:
+            print("Starting a 3-player game.")
+            player_spawn_positions = [
+                (200, spawn_y),  # Player 1 (Left)
+                (self.terrain.width // 2, spawn_y),  # Player 2 (Middle)
+                (self.terrain.width - 200, spawn_y)  # Player 3 (Right)
+            ]
+            # In FFA, teams might just be for color/identification.
+            # P1: Team 1, P2: Team 2, P3: Team 1 (could be Team 2 or a new Team 3 if defined)
+            player_teams = [PlayerTeam.TEAM_1, PlayerTeam.TEAM_2, PlayerTeam.TEAM_1]
+        elif player_count == 2:
+            print("Starting a 2-player game.")
+            player_spawn_positions = [
+                (200, spawn_y),
+                (self.terrain.width - 200, spawn_y)
+            ]
+            player_teams = [PlayerTeam.TEAM_1, PlayerTeam.TEAM_2]
+        else: # Fallback for other counts (e.g., 4 if not yet implemented, or invalid values)
+            print(f"Player count set to {player_count}. Defaulting to 2 players as 3-player specific logic is not met or count is unsupported.")
+            player_spawn_positions = [
+                (200, spawn_y),
+                (self.terrain.width - 200, spawn_y)
+            ]
+            player_teams = [PlayerTeam.TEAM_1, PlayerTeam.TEAM_2]
+            # Update player_count to actual number of players being created for consistency
+            player_count = 2 
 
+
+        for i in range(len(player_spawn_positions)):
+            pos = player_spawn_positions[i]
+            team = player_teams[i]
+            player = Player(pos, team, self.config, self)
+            self.players.append(player)
 
         self.current_player_index = 0
         self.active_weapon = None
@@ -76,7 +92,7 @@ class GameManager:
         self.current_turn_stage = TurnStage.MOVING # Reset stage
         if self.players:
             self.players[self.current_player_index].reset_turn_state()
-        print("Game started. Player 0's turn. Stage: MOVING")
+        print(f"Game started with {len(self.players)} players. Player 0's turn. Stage: MOVING")
 
     def next_turn(self):
         if not self.players or not self.running: return # Check self.running
