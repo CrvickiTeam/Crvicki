@@ -70,11 +70,11 @@
             },
             "small_bomb": {
                 "explosion_radius": 25,
-                "center_damage": 30
+                "center_damage": 25
             },
             "big_bomb": {
                 "explosion_radius": 50,
-                "center_damage": 60,
+                "center_damage": 50,
                 "projectile_draw_size_radius": 7
             },
             "sniper": {
@@ -85,7 +85,7 @@
             "salvo": {
                 "num_projectiles": 15,
                 "shot_delay": 0.07,
-                "angle_spread": 3.0,
+                "angle_spread": 2.5,
                 "power_spread_percentage": 0.1,
                 "explosion_radius": 30,
                 "center_damage": 10,
