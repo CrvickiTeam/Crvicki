@@ -42,6 +42,7 @@ class Player:
         self.speed = movement_cfg.get("drive_speed", 100)
         self.gravity = movement_cfg.get("gravity", 400)
         self.max_step_height = movement_cfg.get("step_height", 5)
+        self.max_move_distance_per_turn = movement_cfg.get("max_move_distance_per_turn", 100) # Distance player can move in one turn
 
         self.width = hitbox_cfg.get("width", 20)
         self.height = hitbox_cfg.get("height", 20)
@@ -57,6 +58,7 @@ class Player:
         self.vy = 0.0
         self.is_grounded = False
         self.is_moving = False
+        self.distance_moved_this_turn = 0.0 # New attribute
 
         # --- Aiming Attributes ---
         self.aim_angle = 45.0 if self.direction == 1 else 135.0
@@ -93,6 +95,11 @@ class Player:
 
         self.rect = pygame.Rect(0, 0, self.width, self.height)
         self.rect.center = (int(self.x), int(self.y))
+
+    def reset_turn_state(self):
+        """Resets player state at the beginning of their turn."""
+        self.distance_moved_this_turn = 0.0
+        # Potentially reset other per-turn states here
 
     def load_sprites(self):
         script_dir = os.path.dirname(__file__)
@@ -197,6 +204,7 @@ class Player:
         if not self.alive or terrain is None: return
 
         # Horizontal Movement
+        original_x = self.x # Store original x for distance calculation
         if self.is_moving:
             dx = self.vx * dt
             target_x = self.x + dx
@@ -214,6 +222,7 @@ class Player:
                         self.x = target_x; self.y -= step; stepped_up = True; break
                 if not stepped_up: self.vx = 0; target_x = self.x
             self.x = target_x
+            self.distance_moved_this_turn += abs(self.x - original_x) # Accumulate distance moved
 
         # Vertical Movement
         if not self.is_grounded: self.vy += self.gravity * dt # Use instance attribute

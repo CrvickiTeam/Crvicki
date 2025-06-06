@@ -3,8 +3,9 @@ import pygame
 
 from scenes.scene import Scene
 from scenes.main_menu_scene import MainMenuScene
-from scenes.game_scene import GameScene
+from scenes.game_scene import GameScene # Make sure GameScene is imported
 from scenes.pause_menu_scene import PauseMenuScene
+from scenes.win_menu_scene import WinMenuScene
 from core.terrain import TerrainMap
 
 from typing import Dict, Any, TYPE_CHECKING
@@ -27,8 +28,9 @@ class SceneManager:
         self.game_controller = game_controller
         self.scenes: Dict[str, Scene] = {
             "MAIN_MENU": MainMenuScene(self, config),
-            "GAME": GameScene(self, config),
+            "GAME": GameScene(self, config), # GameScene is instantiated here
             "PAUSE_MENU": PauseMenuScene(self, config),
+            "WIN_MENU": WinMenuScene(self, config),
         }
         if initial_scene_name not in self.scenes:
             raise ValueError(f"Initial scene '{initial_scene_name}' not found.")
@@ -61,9 +63,13 @@ class SceneManager:
             else:
                 print("Warning: Can only pause from GAME scene.")
                 return # Don't switch if not in game
-        elif new_scene_key == "GAME": # Intending to go to Game scene (e.g. from Main Menu)
+        elif new_scene_key == "GAME": # Intending to go to Game scene (e.g. from Main Menu or Win Menu)
             self.active_scene = self.scenes["GAME"] # Set active scene before starting game
             self.game_controller.start_new_game(TerrainMap.FLAT)
+            # Reset GameScene specific states, like the timer
+            game_scene_instance = self.scenes.get("GAME")
+            if isinstance(game_scene_instance, GameScene): # Type check for safety
+                game_scene_instance.reset_timer() # Call the new reset method
             self.game_paused_by_menu = False
         elif new_scene_key == "MAIN_MENU":
             self.game_paused_by_menu = False # Reset pause state
@@ -76,11 +82,13 @@ class SceneManager:
     def update_active_scene(self, dt: float) -> None:
         # Update logic based on current scene and pause state
         if self.active_scene_key == "GAME":
-            if not self.game_paused_by_menu:
+            if not self.game_paused_by_menu: # Game logic updates if not paused
                 self.scenes["GAME"].update(dt)
-            # If paused, GAME scene logic does not update
+            # If game is over (WIN_MENU active), game_controller.running is False, so GAME update is minimal.
         elif self.active_scene_key == "PAUSE_MENU":
-            self.scenes["PAUSE_MENU"].update(dt) # Pause menu updates its own state (e.g., button hover)
+            self.scenes["PAUSE_MENU"].update(dt) # Pause menu updates its own state
+        elif self.active_scene_key == "WIN_MENU":
+            self.scenes["WIN_MENU"].update(dt) # Win menu updates its own state (e.g., button hover)
         else: # For other scenes like MAIN_MENU
             self.active_scene.update(dt)
 
@@ -88,6 +96,9 @@ class SceneManager:
         if self.active_scene_key == "PAUSE_MENU":
             self.scenes["GAME"].draw(self.screen)      # Draw the underlying game screen (frozen)
             self.scenes["PAUSE_MENU"].draw(self.screen) # Draw the pause menu on top
+        elif self.active_scene_key == "WIN_MENU": 
+            self.scenes["GAME"].draw(self.screen)      # Draw the underlying game screen (frozen)
+            self.scenes["WIN_MENU"].draw(self.screen) # Draw the win menu on top
         else:
             # For GAME, MAIN_MENU, etc., they handle their own full draw, including background
             self.active_scene.draw(self.screen)
