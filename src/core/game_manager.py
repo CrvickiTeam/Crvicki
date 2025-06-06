@@ -1,5 +1,5 @@
 import pygame
-import numpy as np
+import numpy as np # Keep for type hints if used elsewhere, or remove if only for simple_explosion_gradient
 import math
 from typing import Dict, Any, Tuple, List, Optional
 
@@ -117,6 +117,10 @@ class GameManager:
         
         # Find the next alive player
         original_index = self.current_player_index
+        # Ensure players list is not empty before modulo
+        if not self.players:
+            self.running = False
+            return
         while True:
             self.current_player_index = (self.current_player_index + 1) % len(self.players)
             active_player = self.players[self.current_player_index]
@@ -266,53 +270,73 @@ class GameManager:
                 self.switch_to_aiming_stage()
 
         if self.active_weapon:
-            self.active_weapon.update(dt, self.terrain)
+            # Pass 'self' (GameManager instance) to the weapon's update method
+            self.active_weapon.update(dt, self.terrain, self) 
             if self.active_weapon.is_finished():
                 self.active_weapon = None
+                # Check for game over AFTER the weapon's effects are resolved
                 if self.is_game_over():
-                    self.running = False # Stop game logic
+                    self.running = False 
                     return "GAME_OVER"
                 self.next_turn()
         else:
-            # Player movement updates (less likely to cause game over directly)
-            # This part of update is mostly for player input handling before a shot
-            # The primary game over check is after a weapon action.
-            pass # Player movement is handled by GameScene based on input
+            # Player movement/aiming is handled by GameScene based on input
+            pass 
 
         # Fallback check, though primary check is after weapon action
-        if self.is_game_over() and self.running: # Check self.running to avoid double "GAME_OVER"
+        if self.is_game_over() and self.running: 
             self.running = False
             return "GAME_OVER"
             
-        return None
+        return None # Indicates game is ongoing
 
-    def explode(self, x: int, y: int, owner=None) -> None:
-        if not self.terrain: return
-        radius = 25 # Explosion radius from config or weapon
-        strength = 100 # Explosion strength from config or weapon
-        origin_x, origin_y, gradient = simple_explosion_gradient(x, y, radius, strength)
-        self.terrain.destroy_terrain((origin_x, origin_y), gradient)
-        explosion_pos = (x, y)
-        max_damage = 50  # Max damage at center, from config or weapon
+    # Removed the old 'explode' method.
+    # def explode(self, x: int, y: int, owner=None) -> None:
+    #     ...
 
-        for player in self.players:
-            if not player.alive: # Don't process already dead players
-                continue
-            # if player == owner: # Typically, owner is not immune unless specified by weapon
-            #     continue
-            dx = player.x - explosion_pos[0]
-            dy = player.y - explosion_pos[1]
-            distance = math.hypot(dx, dy)
+    # New method to process impact data from weapons
+    def process_impact_effect(self, impact_data: Dict[str, Any]):
+        """
+        Processes an impact effect reported by a weapon.
+        'impact_data' now directly contains 'terrain_gradient' and 'terrain_gradient_offset'.
+        Player damage is now calculated by the Player class using this gradient.
+        """
+        if not self.running: return
 
-            if distance < radius:
-                damage = int(max_damage * (1 - distance / radius))
-                player.apply_damage(damage) # apply_damage sets player.alive to False if HP <= 0
-                print(f"Player {player.team.name} took {damage} damage! Remaining HP: {player.health}")
+        print(f"GameManager processing impact: {impact_data}")
         
-        # No immediate game over check here, it will be caught by the main update loop
-        # when the weapon action finishes. This keeps explode focused on damage.
+        # 1. Affect Terrain
+        terrain_gradient_array = impact_data.get('terrain_gradient')
+        terrain_gradient_offset = impact_data.get('terrain_gradient_offset') 
+        
+        if self.terrain and terrain_gradient_array is not None and terrain_gradient_offset is not None:
+            if terrain_gradient_array.size > 0:
+                self.terrain.destroy_terrain(terrain_gradient_offset, terrain_gradient_array)
+                print(f"Terrain affected at offset {terrain_gradient_offset} with provided gradient.")
+            else:
+                print("Skipping terrain destruction due to empty gradient.")
+        else:
+            print("No pre-calculated terrain gradient or offset provided in impact_data for terrain.")
 
-    def prepare_shot(self, angle: float, power: float):
+        # 2. Affect Players - New Logic
+        # Players will use the same terrain_gradient_array and terrain_gradient_offset
+        # The values in this gradient (derived from projectile's terrain_impact_strength)
+        # will now directly translate to player damage.
+        if terrain_gradient_array is not None and terrain_gradient_offset is not None and terrain_gradient_array.size > 0:
+            for player in self.players:
+                if player.alive:
+                    player.process_explosion_damage(terrain_gradient_offset, terrain_gradient_array)
+        elif impact_data.get('damage_values'): # Fallback for direct damage if specified (optional)
+             damage_values = impact_data.get('damage_values')
+             for player_instance, damage_amount in damage_values:
+                if player_instance.alive and damage_amount > 0:
+                    player_instance.apply_damage(damage_amount)
+                    print(f"Player {player_instance.team.name} took direct damage {damage_amount}! HP: {player_instance.health}")
+        else:
+            print("No gradient data or direct damage values available to affect players.")
+
+    # Renamed from prepare_shot
+    def execute_player_action(self, weapon_type_id: str, angle: float, power: float):
         if self.active_weapon:
             print("Cannot fire: Weapon effect already in progress.")
             return
@@ -323,27 +347,49 @@ class GameManager:
 
         active_player = self.get_active_player()
         if not active_player:
-            print("Cannot fire: No active player.")
+            print("Cannot execute action: No active player.")
             return
 
-        print(f"Player {self.current_player_index} firing!")
-        print(f"  Angle: {angle:.2f} degrees")
-        print(f"  Power: {power:.2f}")
+        # Future: Decrement weapon from player's inventory here
+        # if active_player.has_weapon(weapon_type_id):
+        #     active_player.consume_weapon(weapon_type_id) 
+        # else:
+        #     print(f"Player {active_player.team.name} does not have {weapon_type_id}. Cannot fire.")
+        #     return
 
+        print(f"Player {self.current_player_index} ({active_player.team.name}) executing action with {weapon_type_id}!")
+        print(f"  Angle: {angle:.2f} degrees, Power: {power:.2f}")
 
-        weapon_instance = BasicCannon(active_player, self)
-        weapon_instance.activate(angle, power)
-        self.active_weapon = weapon_instance
+        weapon_instance: Optional[Weapon] = None
+        # Instantiate the selected weapon
+        if weapon_type_id == "basic_cannon": # This ID should match what GameScene sends
+            # Pass 'self' (GameManager) to the weapon if it needs to call back (e.g. process_impact_effect)
+            weapon_instance = BasicCannon(owner=active_player, game_manager=self) 
+        # elif weapon_type_id == "another_weapon_id":
+        #     from .weapons.another_weapon import AnotherWeapon # Example
+        #     weapon_instance = AnotherWeapon(owner=active_player, game_manager=self)
+        else:
+            print(f"Error: Unknown weapon type ID '{weapon_type_id}'. Cannot create weapon instance.")
+            return 
 
+        if weapon_instance:
+            weapon_instance.activate(angle, power)
+            self.active_weapon = weapon_instance # Mark that an action is in progress
+        # No else needed here as the error is handled above
 
     def draw_components(self, screen: pygame.Surface) -> None:
-        if not self.running: return
+        # Drawing can occur even if self.running is False (e.g. game over screen)
         if self.terrain: self.terrain.draw(screen)
-        for player in self.players: player.draw(screen)
+        
+        for player in self.players: 
+            # Let Player.draw decide if it draws dead players or not, or add check here
+            if player.alive:
+                player.draw(screen) 
+            
         if self.active_weapon: self.active_weapon.draw(screen)
 
-        if not self.active_weapon:
+        if not self.active_weapon and self.running: # Only draw indicator if game is running
             active_player = self.get_active_player()
-            if active_player:
+            if active_player: # Active player is already checked for being alive by get_active_player
                 indicator_pos = (int(active_player.x), int(active_player.y) - active_player.rect.height // 2 - 10)
                 pygame.draw.circle(screen, (255, 255, 0), indicator_pos, 5)

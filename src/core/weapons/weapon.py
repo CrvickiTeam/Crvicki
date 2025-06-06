@@ -1,5 +1,6 @@
 from __future__ import annotations
 import pygame
+import math # Import math here if it's used for default calculations in base Weapon
 from typing import List, TYPE_CHECKING
 
 # Use TYPE_CHECKING to avoid circular imports for type hints
@@ -7,60 +8,65 @@ if TYPE_CHECKING:
     from ..player import Player
     from ..terrain import Terrain
     from ..game_manager import GameManager
-    from ..projectiles.projectile import Projectile # Assuming a base Projectile class exists
+    from ..projectiles.projectile import Projectile 
 
 class Weapon:
     """Base class for all weapons."""
 
-    def __init__(self, owner: Player, game_manager: GameManager):
+    # Default power scaling factor for all weapons.
+    # Subclasses can override this if they have different launch mechanics.
+    POWER_TO_VELOCITY_SCALE: float = 5 # Using the value from BasicCannon as default
+
+    def __init__(self, owner: 'Player', game_manager: 'GameManager'):
         """
         Initializes the weapon.
 
         Args:
             owner: The player who owns/fired this weapon.
-            game_manager: Reference to the game manager for interactions (e.g., explosions).
+            game_manager: Reference to the game manager (passed to update).
         """
         self.owner = owner
-        self.game_manager = game_manager
-        self.projectiles: List['Projectile'] = [] # List to hold active projectiles managed by this weapon instance
-        self._is_finished = False # Flag to indicate if the weapon's action is complete
+        self.projectiles: List['Projectile'] = [] 
+        self._is_finished = False 
 
     def activate(self, angle: float, power: float):
         """
         Starts the weapon's action (e.g., launching projectiles).
         This method should be implemented by subclasses.
+        It typically involves calculating initial velocity based on angle, power,
+        and self.POWER_TO_VELOCITY_SCALE.
 
         Args:
             angle: The launch angle in degrees.
             power: The launch power.
         """
-        # Example: Subclasses would create and add projectiles here
-        # projectile = SomeProjectile(...)
-        # self.projectiles.append(projectile)
         raise NotImplementedError("Subclasses must implement activate()")
 
-    def update(self, dt: float, terrain: Terrain):
+    def update(self, dt: float, terrain: 'Terrain', game_manager: 'GameManager'):
         """
         Updates the state of the weapon and its projectiles.
+        If a projectile is finished, its impact data is processed via the GameManager.
         Checks if the weapon's action is complete.
 
         Args:
             dt: Delta time since the last frame.
             terrain: The game terrain for collision checks.
+            game_manager: The game manager to process impact effects.
         """
         if self._is_finished:
             return
 
-        # Update all active projectiles managed by this weapon
         # Iterate backwards if removing items
         for i in range(len(self.projectiles) - 1, -1, -1):
             proj = self.projectiles[i]
-            proj.update(dt, terrain, self.game_manager)
-            # Check if the projectile itself is finished (collided, out of bounds, etc.)
+            proj.update(dt, terrain) 
+
             if proj.is_finished():
-                # Optional: Handle projectile destruction effects here if needed
-                # Remove the finished projectile from the list
-                self.projectiles.pop(i)
+                impact_data = proj.get_impact_data()
+                if impact_data:
+                    game_manager.process_impact_effect(impact_data)
+                
+                self.projectiles.pop(i) 
 
         # Check if the weapon's action is complete (e.g., all projectiles are gone)
         if not self.projectiles:

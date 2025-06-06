@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Tuple
 
 import pygame
 from enum import Enum
@@ -372,3 +372,56 @@ class Player:
             self.health = 0
             self.alive = False
             print(f"Player from team {self.team.name} has died.")
+
+    def process_explosion_damage(self, gradient_origin: Tuple[int, int], damage_gradient: np.ndarray):
+        """
+        Calculates and applies damage to the player based on an explosion's damage gradient.
+        Damage taken is the maximum value from the gradient that overlaps with the player's hitbox.
+        """
+        if not self.alive or damage_gradient is None or damage_gradient.size == 0:
+            return
+
+        player_rect = self.rect # Player's hitbox in world coordinates
+
+        # Gradient's coverage in world coordinates
+        grad_world_left = gradient_origin[0]
+        grad_world_top = gradient_origin[1]
+        grad_world_right = gradient_origin[0] + damage_gradient.shape[1]
+        grad_world_bottom = gradient_origin[1] + damage_gradient.shape[0]
+
+        # Calculate the overlapping rectangle in world coordinates
+        overlap_left = max(player_rect.left, grad_world_left)
+        overlap_top = max(player_rect.top, grad_world_top)
+        overlap_right = min(player_rect.right, grad_world_right)
+        overlap_bottom = min(player_rect.bottom, grad_world_bottom)
+
+        # Check if there is any actual overlap
+        if overlap_left < overlap_right and overlap_top < overlap_bottom:
+            # Convert overlap world coordinates to indices within the damage_gradient array
+            # Ensure indices are integers and within the bounds of the gradient array
+            grad_idx_start_col = max(0, overlap_left - grad_world_left)
+            grad_idx_end_col = max(0, overlap_right - grad_world_left)
+            grad_idx_start_row = max(0, overlap_top - grad_world_top)
+            grad_idx_end_row = max(0, overlap_bottom - grad_world_top)
+            
+            # Ensure end indices are not smaller than start indices for slicing
+            grad_idx_end_col = max(grad_idx_start_col, grad_idx_end_col)
+            grad_idx_end_row = max(grad_idx_start_row, grad_idx_end_row)
+
+
+            # Slice the relevant part of the damage gradient
+            # Ensure slices are within the actual dimensions of damage_gradient
+            relevant_gradient_part = damage_gradient[
+                grad_idx_start_row : min(grad_idx_end_row, damage_gradient.shape[0]),
+                grad_idx_start_col : min(grad_idx_end_col, damage_gradient.shape[1])
+            ]
+
+            if relevant_gradient_part.size > 0:
+                max_damage_value = np.max(relevant_gradient_part)
+                if max_damage_value > 0:
+                    # print(f"Player {self.team.name} hitbox overlaps with gradient. Max damage in overlap: {max_damage_value}")
+                    self.apply_damage(int(max_damage_value))
+            # else:
+                # print(f"Player {self.team.name} hitbox overlaps, but relevant gradient part is empty.")
+        # else:
+            # print(f"Player {self.team.name} hitbox does not overlap with damage gradient.")

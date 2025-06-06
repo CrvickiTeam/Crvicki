@@ -55,11 +55,12 @@ class GameScene(Scene):
             self.game_time_seconds += dt # Increment game timer
 
             # Update all players' physics and state
+            # This loop ensures all players are affected by gravity, etc.
             for player in self.game_controller.players:
                 if player.alive: # Only update alive players
                     player.update(dt, self.game_controller.terrain)
 
-            # Handle input for the active player
+            # Handle input for the active player's movement and aiming
             active_player = self.game_controller.get_active_player()
             if active_player: # active_player is already checked for being alive by get_active_player
                 if not self.game_controller.active_weapon: # Only allow player input if no weapon is active
@@ -86,7 +87,7 @@ class GameScene(Scene):
                         if keys[pygame.K_UP]:
                             active_player.increase_power(dt)
         
-        # Update game controller (handles weapons, turns, game over checks)
+        # Update game controller (handles active weapon logic, turn progression, game over checks)
         game_status = self.game_controller.update(dt)
 
         if game_status == "GAME_OVER":
