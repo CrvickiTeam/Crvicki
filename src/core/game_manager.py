@@ -5,7 +5,8 @@ from typing import Dict, Any, Tuple, List, Optional
 from .terrain import Terrain, TerrainMap # Assuming TerrainMap might be used elsewhere
 from .player import Player, PlayerTeam 
 from .weapons.weapon import Weapon
-from .weapons.basic_cannon import BasicCannon
+# from .weapons.basic_cannon import BasicCannon
+from .weapons.small_bomb import SmallBomb # Add this
 # from .weapons.sniper_rifle import SniperRifle # Future weapon
 # from .weapons.big_bomb_cannon import BigBombCannon # Future weapon
 # from .weapons.cluster_gun import ClusterGun # Future weapon
@@ -278,8 +279,10 @@ class GameManager:
         # print(f"  Angle: {angle:.2f} degrees, Power: {power:.2f}")
 
         weapon_instance: Optional[Weapon] = None
-        if weapon_type_id == "basic_cannon": 
-            weapon_instance = BasicCannon(owner=active_player, game_manager=self) 
+        # if weapon_type_id == "basic_cannon":  # Old
+        #     weapon_instance = BasicCannon(owner=active_player, game_manager=self) 
+        if weapon_type_id == "small_bomb": # New - ensure this matches the string used in GameScene
+            weapon_instance = SmallBomb(owner=active_player, game_manager=self)
         # Add other weapon types here later:
         # elif weapon_type_id == "sniper_rifle":
         #     weapon_instance = SniperRifle(owner=active_player, game_manager=self)
