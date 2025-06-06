@@ -37,7 +37,7 @@ class Player:
         self.speed: float = float(movement_cfg.get("drive_speed", 100.0))
         self.gravity: float = float(movement_cfg.get("gravity", 400.0))
         self.max_step_height: int = int(movement_cfg.get("step_height", 5))
-        self.max_move_distance_per_turn: float = float(movement_cfg.get("max_move_distance_per_turn", 250.0)) 
+        self.max_move_distance_per_turn: float = float(movement_cfg.get("max_move_distance_per_turn", 150.0)) 
         self.health: int = int(player_cfg.get("max_health", 100))
 
         self.width: int = int(hitbox_cfg.get("width", 20))

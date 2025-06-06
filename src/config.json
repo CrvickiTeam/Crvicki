@@ -44,21 +44,44 @@
         },
         "player": {
             "movement": {
-                "drive_speed": 100,
-                "gravity": 400,
-                "step_height": 5
+                "drive_speed": 100.0,
+                "gravity": 400.0,
+                "step_height": 5,
+                "max_move_distance_per_turn": 150.0
             },
             "hitbox": {
                 "width": 20,
                 "height": 20
             },
             "aiming": {
-                "min_power": 10,
-                "max_power": 135,
-                "default_power": 50,
-                "angle_change_rate": 60,
-                "power_change_rate": 50
+                "min_power": 10.0,
+                "max_power": 135.0,
+                "default_power": 50.0,
+                "angle_change_rate": 60.0,
+                "power_change_rate": 50.0
+            },
+            "max_health": 100
+        },
+        "weapons": {
+            "defaults": {
+                "power_to_velocity_scale": 5.0
             }
+        },
+        "projectiles": {
+            "defaults": {
+                "gravity": 400.0,
+                "draw_size_radius": 5,
+                "explosion_radius": 30,
+                "max_player_damage": 50,
+                "terrain_impact_strength": 100
+            }
+        },
+        "game_settings": {
+            "player_count": 2,
+            "game_mode": "FFA"
         }
-    }   
+    },
+    "logging": {
+        "level": "INFO"
+    }
 }

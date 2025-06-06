@@ -1,9 +1,9 @@
 import pygame
 import math
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Tuple
 
-from .weapon import Weapon # Import the base class
-from ..projectiles.basic_projectile import BasicProjectile # Import the specific projectile
+from .weapon import Weapon 
+from ..projectiles.basic_projectile import BasicProjectile 
 
 if TYPE_CHECKING:
     from ..player import Player
@@ -17,29 +17,37 @@ class BasicCannon(Weapon):
     # POWER_TO_VELOCITY_SCALE = 0.8 # Example override
 
     def __init__(self, owner: 'Player', game_manager: 'GameManager'):
-        super().__init__(owner, game_manager)
+        super().__init__(owner, game_manager) # game_manager is passed to base
 
     def activate(self, angle: float, power: float):
-        """
-        Launches a single BasicProjectile.
-        """
+        super().activate(angle, power) # Call base to reset projectiles and _is_finished
+
+        # The check below is now mostly redundant if super().activate() is called,
+        # as _is_finished would be False and projectiles empty.
+        # Keeping it if you have specific logic where it might still be relevant.
         if self._is_finished or self.projectiles: 
-            print("BasicCannon: Cannot activate, already finished or projectile active.")
+            # This path should ideally not be taken if super().activate() was just called.
+            # print("BasicCannon: Attempted to activate when already finished or has projectiles (after super call).")
             return
 
         angle_rad = math.radians(angle)
-        # Use the POWER_TO_VELOCITY_SCALE from the class (or instance if overridden)
-        velocity_magnitude = power * self.POWER_TO_VELOCITY_SCALE 
+        velocity_magnitude = power * self.power_to_velocity_scale # Use instance variable
         initial_vx = velocity_magnitude * math.cos(angle_rad)
         initial_vy = -velocity_magnitude * math.sin(angle_rad)
 
         start_x = self.owner.x 
-        start_y = self.owner.y - (self.owner.rect.height / 2) 
-        start_pos = (start_x, start_y)
+        start_y = self.owner.y 
+        start_pos: Tuple[float, float] = (start_x, start_y)
 
-        projectile = BasicProjectile(start_pos, initial_vx, initial_vy, self.owner)
+        projectile = BasicProjectile(
+            start_pos, 
+            initial_vx, 
+            initial_vy, 
+            self.owner,
+            self.game_manager # <<< PASS self.game_manager
+        )
         self.projectiles.append(projectile)
-        self._is_finished = False
+        # self._is_finished is already False due to super().activate()
 
     # update() is inherited from Weapon
     # draw() is inherited from Weapon
