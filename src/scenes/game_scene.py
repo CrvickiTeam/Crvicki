@@ -23,6 +23,11 @@ class GameScene(Scene):
         self.game_time_seconds = 0.0
         self.text_color = (255, 255, 255) # White color for text
 
+    def reset_timer(self) -> None:
+        """Resets the game timer to zero."""
+        self.game_time_seconds = 0.0
+        print("Game timer reset.")
+
     def handle_input(self, event: pygame.event.Event) -> None:
         active_player = self.game_controller.get_active_player()
         if event.type == pygame.KEYDOWN:
