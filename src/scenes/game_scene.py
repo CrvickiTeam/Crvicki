@@ -57,8 +57,8 @@ class GameScene(Scene):
         game_status = self.game_controller.update(dt)
 
         if game_status == "GAME_OVER":
-            print("GameScene: Detected GAME_OVER, switching to MAIN_MENU.")
-            self.manager.switch_scene("MAIN_MENU")
+            print("GameScene: Detected GAME_OVER, switching to WIN_MENU.")
+            self.manager.switch_scene("WIN_MENU")
 
     def draw(self, screen: pygame.Surface) -> None:
         screen.fill((100, 160, 255))

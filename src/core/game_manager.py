@@ -30,10 +30,12 @@ class GameManager:
         self.current_player_index: int = 0
         self.running: bool = False
         self.active_weapon: Optional[Weapon] = None
+        self.winner_team: Optional[PlayerTeam] = None
 
     def start_new_game(self, map: TerrainMap) -> None:
         self.terrain = Terrain(map, self.config)
         self.players = []
+        self.winner_team = None # Reset winner
         # TODO: Get player count from config['game_settings']['player_count']
         # For now, defaulting to 2 players
         player1_start_pos = (200, 200) # These positions should be dynamic or from config
@@ -89,25 +91,43 @@ class GameManager:
                 return self.players[self.current_player_index]
         return None
 
+    def get_winner_team(self) -> Optional[PlayerTeam]:
+        return self.winner_team
+
     def is_game_over(self) -> bool:
         if not self.players:
+            self.winner_team = None
+            self.config['game_result'] = {'winner_team': None} # Store result
             return False # No players, game can't be over in a typical sense yet
 
         alive_players = [p for p in self.players if p.alive]
         num_alive_players = len(alive_players)
 
         if len(self.players) == 0 : # Should not happen if game started
+            self.winner_team = None
+            self.config['game_result'] = {'winner_team': None} # Store result
             return False
         if len(self.players) == 1: # Single player mode (if ever implemented)
-             return num_alive_players == 0
+            if num_alive_players == 0:
+                self.winner_team = None # Or potentially a "draw" or "loss" state
+                self.config['game_result'] = {'winner_team': None} # Store result
+                return True
+            # If single player is alive, game is not over yet for them.
+            return False
+
 
         # For 2+ players (current FFA setup): game is over if 1 or 0 players are left alive.
         if num_alive_players <= 1:
             if num_alive_players == 1:
-                print(f"Game Over! Player {alive_players[0].team.name} is the winner!")
+                self.winner_team = alive_players[0].team
+                print(f"Game Over! Player {self.winner_team.name} is the winner!")
             else:
+                self.winner_team = None # No winner if all die simultaneously
                 print("Game Over! No players left alive.")
+                self.config['game_result'] = {'winner_team': self.winner_team} # Store result
             return True
+        self.winner_team = None
+        self.config['game_result'] = {'winner_team': None} # Game not over, no winner yet
         return False
 
     def update(self, dt: float) -> Optional[str]: 
