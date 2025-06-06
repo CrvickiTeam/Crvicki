@@ -7,6 +7,7 @@ BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
 LIGHT_GRAY = (200, 200, 200)
 DARK_GRAY = (100, 100, 100)
+BUTTON_DISABLED_COLOR = (160, 160, 160) # Color for disabled buttons
 
 BUTTON_IDLE_COLOR = (0, 150, 0)
 BUTTON_HOVER_COLOR = DARK_GRAY
@@ -99,12 +100,22 @@ class MainMenuScene(Scene):
                     elif self.player_count == 4:
                         self.player_count = 2
                     print(f"Player count changed to: {self.player_count}")
-                elif self.game_mode_button_rect.collidepoint(event.pos):
-                    if self.game_mode == "FFA":
-                        self.game_mode = "TEAMS"
-                    else:
+
+                    # If player count is not 4, force game mode to FFA
+                    if self.player_count != 4 and self.game_mode == "TEAMS":
                         self.game_mode = "FFA"
-                    print(f"Game mode changed to: {self.game_mode}")
+                        print(f"Game mode automatically set to FFA due to player count.")
+
+                elif self.game_mode_button_rect.collidepoint(event.pos):
+                    # Only allow game mode change if player count is 4
+                    if self.player_count == 4:
+                        if self.game_mode == "FFA":
+                            self.game_mode = "TEAMS"
+                        else:
+                            self.game_mode = "FFA"
+                        print(f"Game mode changed to: {self.game_mode}")
+                    else:
+                        print("Game mode cannot be changed when player count is not 4.")
 
     def update(self, dt: float) -> None:
         mouse_pos = pygame.mouse.get_pos()
@@ -121,14 +132,16 @@ class MainMenuScene(Scene):
         else:
             self.current_player_count_button_color = self.player_count_button_idle_color
 
-        # Game Mode Button hover
-        if self.game_mode_button_rect.collidepoint(mouse_pos):
-            self.current_game_mode_button_color = self.game_mode_button_hover_color
+        # Game Mode Button hover and state
+        if self.player_count != 4:
+            self.current_game_mode_button_color = BUTTON_DISABLED_COLOR
         else:
-            self.current_game_mode_button_color = self.game_mode_button_idle_color
+            if self.game_mode_button_rect.collidepoint(mouse_pos):
+                self.current_game_mode_button_color = self.game_mode_button_hover_color
+            else:
+                self.current_game_mode_button_color = self.game_mode_button_idle_color
 
-        # Update text surfaces if values change (though they don't dynamically yet)
-        # This is good practice if you add functionality to change them later.
+        # Update text surfaces if values change
         self.player_count_text_surface = self.button_font.render(f"Player count: {self.player_count}", True, BUTTON_TEXT_COLOR)
         self.player_count_text_rect = self.player_count_text_surface.get_rect(center=self.player_count_button_rect.center)
         self.game_mode_text_surface = self.button_font.render(f"Game mode: {self.game_mode}", True, BUTTON_TEXT_COLOR)

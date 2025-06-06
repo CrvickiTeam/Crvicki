@@ -86,14 +86,41 @@ class WinMenuScene(Scene):
         # Draw the semi-transparent overlay
         screen.blit(self.overlay_surface, (0, 0))
 
-        # Determine winner and set title
-        winner_team = self.manager.game_controller.get_winner_team()
-        if winner_team:
-            # Assuming PlayerTeam.TEAM_1.value is 1, PlayerTeam.TEAM_2.value is 2, etc.
-            title_string = f"Player {winner_team.value} Wins!"
-        else:
-            # Handle cases like a draw if no winner_team is set
-            title_string = "Game Over!" # Or "It's a Draw!"
+        game_settings = self.manager.config.get('game_settings', {})
+        player_count_setting = game_settings.get('player_count', 0)
+        game_mode_setting = game_settings.get('game_mode', "FFA")
+
+        title_string = "Game Over!" # Default
+
+        is_team_mode_active = (player_count_setting == 4 and game_mode_setting == "TEAMS")
+
+        if is_team_mode_active:
+            winner_team_obj = self.manager.game_controller.get_winner_team()
+            if winner_team_obj:
+                title_string = f"Team {winner_team_obj.value} Wins!"
+            else:
+                # In team mode, if no winner_team_obj is set by game_controller by the time
+                # is_game_over returns true, it implies a draw.
+                title_string = "It's a Draw!"
+        else: # FFA or other modes
+            winning_player = self.manager.game_controller.get_winning_player()
+            if winning_player:
+                try:
+                    all_players = self.manager.game_controller.players
+                    player_number = all_players.index(winning_player) + 1
+                    title_string = f"Player {player_number} Wins!"
+                except ValueError:
+                    # Fallback if player not found in list (should not happen if winning_player is valid)
+                    # Or if team-based win display is ever needed without a specific player (less likely for FFA)
+                    # For FFA, if winning_player is set, we should ideally use its info.
+                    # The original code had a fallback to winner_team.value which might be confusing.
+                    # Let's make it a generic player win if index fails.
+                    title_string = f"Player Wins!" 
+            else:
+                # No winning_player in FFA mode implies a draw (or game ended before a winner).
+                # GameManager.is_game_over should set winning_player to None for an FFA draw.
+                title_string = "It's a Draw!"
+
 
         self.title_text_surface = self.title_font.render(title_string, True, WHITE)
         self.title_text_rect = self.title_text_surface.get_rect(center=(self.screen_width // 2, self.screen_height // 2 - 100))
