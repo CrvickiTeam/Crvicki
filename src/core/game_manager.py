@@ -71,8 +71,21 @@ class GameManager:
                 (self.terrain.width - 200, spawn_y)
             ]
             player_teams = [PlayerTeam.TEAM_1, PlayerTeam.TEAM_2]
+        elif player_count == 4:
+            print("Starting a 4-player game.")
+            # Distribute players somewhat evenly, e.g., at 1/5, 2/5, 3/5, 4/5 of the width
+            base_offset = self.terrain.width // 5
+            player_spawn_positions = [
+                (base_offset, spawn_y),            # Player 1
+                (base_offset * 2, spawn_y),        # Player 2
+                (base_offset * 3, spawn_y),        # Player 3
+                (base_offset * 4, spawn_y)         # Player 4
+            ]
+            # Assign teams, e.g., P1 & P3 vs P2 & P4 if teams were functional,
+            # or just for colors in FFA.
+            player_teams = [PlayerTeam.TEAM_1, PlayerTeam.TEAM_2, PlayerTeam.TEAM_1, PlayerTeam.TEAM_2]
         else: # Fallback for other counts (e.g., 4 if not yet implemented, or invalid values)
-            print(f"Player count set to {player_count}. Defaulting to 2 players as 3-player specific logic is not met or count is unsupported.")
+            print(f"Player count set to {player_count}. Defaulting to 2 players as specific logic is not met or count is unsupported.")
             player_spawn_positions = [
                 (200, spawn_y),
                 (self.terrain.width - 200, spawn_y)
