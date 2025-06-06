@@ -7,6 +7,11 @@ from .terrain import Terrain, TerrainMap
 from .player import Player, PlayerTeam
 from .weapons.weapon import Weapon
 from .weapons.basic_cannon import BasicCannon
+from enum import Enum, auto
+
+class TurnStage(Enum):
+    MOVING = auto()
+    AIMING = auto()
 
 def simple_explosion_gradient(x: int, y: int, radius: int, center_strength: int) -> Tuple[int, int, np.ndarray]:
     gradient = np.zeros((radius * 2 + 1, radius * 2 + 1), dtype=np.uint8)
@@ -31,6 +36,7 @@ class GameManager:
         self.running: bool = False
         self.active_weapon: Optional[Weapon] = None
         self.winner_team: Optional[PlayerTeam] = None
+        self.current_turn_stage: TurnStage = TurnStage.MOVING # New attribute
 
     def start_new_game(self, map: TerrainMap) -> None:
         self.terrain = Terrain(map, self.config)
@@ -67,18 +73,24 @@ class GameManager:
         self.current_player_index = 0
         self.active_weapon = None
         self.running = True
-        print("Game started. Player 0's turn.")
+        self.current_turn_stage = TurnStage.MOVING # Reset stage
+        if self.players:
+            self.players[self.current_player_index].reset_turn_state()
+        print("Game started. Player 0's turn. Stage: MOVING")
 
     def next_turn(self):
         if not self.players or not self.running: return # Check self.running
         self.active_weapon = None
+        self.current_turn_stage = TurnStage.MOVING # Reset to moving stage
         
         # Find the next alive player
         original_index = self.current_player_index
         while True:
             self.current_player_index = (self.current_player_index + 1) % len(self.players)
-            if self.players[self.current_player_index].alive:
-                print(f"Turn changed to Player {self.current_player_index}")
+            active_player = self.players[self.current_player_index]
+            if active_player.alive:
+                active_player.reset_turn_state() # Reset distance moved for the new player
+                print(f"Turn changed to Player {self.current_player_index}. Stage: MOVING")
                 break
             if self.current_player_index == original_index: # Cycled through all players, none are alive (should be caught by is_game_over)
                 print("No alive players left to switch turn to.")
@@ -93,6 +105,14 @@ class GameManager:
 
     def get_winner_team(self) -> Optional[PlayerTeam]:
         return self.winner_team
+
+    def switch_to_aiming_stage(self):
+        if self.current_turn_stage == TurnStage.MOVING:
+            self.current_turn_stage = TurnStage.AIMING
+            active_player = self.get_active_player()
+            if active_player:
+                active_player.stop_moving() # Ensure player stops moving when switching to aiming
+            print(f"Player {self.current_player_index} switched to AIMING stage.")
 
     def is_game_over(self) -> bool:
         if not self.players:
@@ -133,6 +153,12 @@ class GameManager:
     def update(self, dt: float) -> Optional[str]: 
         if not self.running:
             return None # Or "GAME_ALREADY_ENDED" if specific status needed
+
+        # Check for automatic stage transition if player moved max distance
+        active_player = self.get_active_player()
+        if active_player and self.current_turn_stage == TurnStage.MOVING:
+            if active_player.distance_moved_this_turn >= active_player.max_move_distance_per_turn:
+                self.switch_to_aiming_stage()
 
         if self.active_weapon:
             self.active_weapon.update(dt, self.terrain)
@@ -184,6 +210,10 @@ class GameManager:
     def prepare_shot(self, angle: float, power: float):
         if self.active_weapon:
             print("Cannot fire: Weapon effect already in progress.")
+            return
+
+        if self.current_turn_stage != TurnStage.AIMING:
+            print("Cannot fire: Not in aiming stage.")
             return
 
         active_player = self.get_active_player()
