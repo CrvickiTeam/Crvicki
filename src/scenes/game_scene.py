@@ -1,9 +1,9 @@
 import pygame
-from typing import Optional # Ensure Optional is imported
+from typing import Optional 
 
 from .scene import Scene
-from core.game_manager import GameManager, TurnStage # Import GameManager for type hint
-from core.player import Player # Import Player for type hint
+from core.game_manager import GameManager # TurnStage removed from import
+from core.player import Player 
 
 class GameScene(Scene):
     """Game scene where the main gameplay occurs."""
@@ -34,53 +34,42 @@ class GameScene(Scene):
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_ESCAPE:
                 self.manager.switch_scene("PAUSE_MENU")
-            # K_TAB is not handled here based on current code
             elif event.key == pygame.K_SPACE:
                 if active_player: # Ensure there's an active player
-                    if self.game_controller.current_turn_stage == TurnStage.MOVING:
-                        self.game_controller.switch_to_aiming_stage()
-                    elif self.game_controller.current_turn_stage == TurnStage.AIMING:
-                        angle, power = active_player.get_shot_info()
-                        # Use a default weapon ID or implement weapon selection
-                        self.game_controller.execute_player_action("basic_cannon", angle, power) 
+                    # if self.game_controller.current_turn_stage == TurnStage.MOVING: # REMOVE
+                    #     self.game_controller.switch_to_aiming_stage() # REMOVE
+                    # elif self.game_controller.current_turn_stage == TurnStage.AIMING: # REMOVE
+                    angle, power = active_player.get_shot_info()
+                    # Use a default weapon ID or implement weapon selection
+                    self.game_controller.execute_player_action("basic_cannon", angle, power) 
 
     def update(self, dt: float) -> None:
-        keys: pygame.key.ScancodeWrapper = pygame.key.get_pressed() # More specific type
+        keys: pygame.key.ScancodeWrapper = pygame.key.get_pressed() 
         
         if self.game_controller.running:
             self.game_time_seconds += dt 
 
-            # Update all players' physics (gravity, etc.)
-            # This should happen regardless of whose turn it is or if a weapon is active
             for player in self.game_controller.players:
-                if player.alive and self.game_controller.terrain: # Ensure terrain exists
+                if player.alive and self.game_controller.terrain: 
                     player.update(dt, self.game_controller.terrain)
 
             active_player: Optional[Player] = self.game_controller.get_active_player()
-            if active_player and not self.game_controller.active_weapon: # Only allow input if no weapon is active
-                if self.game_controller.current_turn_stage == TurnStage.MOVING:
-                    # Assuming Player has distance_moved_this_turn and max_move_distance_per_turn
-                    can_move = True
-                    if hasattr(active_player, 'distance_moved_this_turn') and \
-                       hasattr(active_player, 'max_move_distance_per_turn'):
-                        if active_player.distance_moved_this_turn >= active_player.max_move_distance_per_turn:
-                            can_move = False
-                            # GameManager.update handles automatic switch if max distance is met
-                    
-                    if can_move:
-                        if keys[pygame.K_a]:
-                            active_player.move_left()
-                        elif keys[pygame.K_d]: # Use elif to prevent moving both ways in one frame
-                            active_player.move_right()
-                        # else: # Optional: stop moving if no key is pressed, if Player.update doesn't handle this
-                        #    active_player.stop_moving() # This might conflict if Player.update has its own logic
+            if active_player and not self.game_controller.active_weapon: 
+                # Player can always try to move and aim if it's their turn and no weapon is active.
+                # The Player class itself will handle movement limits (fuel).
                 
-                elif self.game_controller.current_turn_stage == TurnStage.AIMING:
-                    if keys[pygame.K_LEFT]: active_player.aim_up(dt)
-                    elif keys[pygame.K_RIGHT]: active_player.aim_down(dt)
-                    
-                    if keys[pygame.K_UP]: active_player.increase_power(dt)
-                    elif keys[pygame.K_DOWN]: active_player.decrease_power(dt)
+                # Movement input
+                if keys[pygame.K_a]:
+                    active_player.move_left()
+                elif keys[pygame.K_d]: 
+                    active_player.move_right()
+                
+                # Aiming input
+                if keys[pygame.K_LEFT]: active_player.aim_up(dt)
+                elif keys[pygame.K_RIGHT]: active_player.aim_down(dt)
+                
+                if keys[pygame.K_UP]: active_player.increase_power(dt)
+                elif keys[pygame.K_DOWN]: active_player.decrease_power(dt)
         
         game_status: Optional[str] = self.game_controller.update(dt)
 
@@ -108,13 +97,13 @@ class GameScene(Scene):
         player_turn_rect: pygame.Rect = player_turn_surface.get_rect(topleft=(20, 20))
         screen.blit(player_turn_surface, player_turn_rect)
 
-        stage_text_str: str = ""
-        if self.game_controller.current_turn_stage == TurnStage.MOVING:
-            stage_text_str = "Moving stage"
-        elif self.game_controller.current_turn_stage == TurnStage.AIMING:
-            stage_text_str = "Shooting stage"
+        # stage_text_str: str = "" # REMOVE STAGE DISPLAY
+        # if self.game_controller.current_turn_stage == TurnStage.MOVING:
+        #     stage_text_str = "Moving stage"
+        # elif self.game_controller.current_turn_stage == TurnStage.AIMING:
+        #     stage_text_str = "Shooting stage"
         
-        if stage_text_str:
-            stage_surface: pygame.Surface = self.font.render(stage_text_str, True, self.text_color)
-            stage_rect: pygame.Rect = stage_surface.get_rect(topleft=(20, player_turn_rect.bottom + 5))
-            screen.blit(stage_surface, stage_rect)
+        # if stage_text_str:
+        #     stage_surface: pygame.Surface = self.font.render(stage_text_str, True, self.text_color)
+        #     stage_rect: pygame.Rect = stage_surface.get_rect(topleft=(20, player_turn_rect.bottom + 5))
+        #     screen.blit(stage_surface, stage_rect)

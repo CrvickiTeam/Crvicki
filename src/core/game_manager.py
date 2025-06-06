@@ -4,14 +4,14 @@ import math
 from typing import Dict, Any, Tuple, List, Optional
 
 from .terrain import Terrain, TerrainMap
-from .player import Player, PlayerTeam # Assuming Player has reset_turn_state, distance_moved_this_turn, max_move_distance_per_turn
+from .player import Player, PlayerTeam # Player class will now handle its own movement limits
 from .weapons.weapon import Weapon
 from .weapons.basic_cannon import BasicCannon
-from enum import Enum, auto
+# from enum import Enum, auto # auto might not be needed if TurnStage is the only user
 
-class TurnStage(Enum):
-    MOVING = auto()
-    AIMING = auto()
+# class TurnStage(Enum): # REMOVE THIS ENUM
+#     MOVING = auto()
+#     AIMING = auto()
 
 
 class GameManager:
@@ -24,7 +24,7 @@ class GameManager:
         self.active_weapon: Optional[Weapon] = None
         self.winner_team: Optional[PlayerTeam] = None
         self.winning_player: Optional[Player] = None 
-        self.current_turn_stage: TurnStage = TurnStage.MOVING
+        # self.current_turn_stage: TurnStage = TurnStage.MOVING # REMOVE THIS ATTRIBUTE
 
     def start_new_game(self, map_type: TerrainMap) -> None: # Renamed map to map_type for clarity
         self.terrain = Terrain(map_type, self.config)
@@ -82,17 +82,17 @@ class GameManager:
         self.current_player_index = 0
         self.active_weapon = None
         self.running = True
-        self.current_turn_stage = TurnStage.MOVING
+        # self.current_turn_stage = TurnStage.MOVING # REMOVE THIS
         if self.players: # Ensure players list is not empty
             current_player = self.players[self.current_player_index]
             if hasattr(current_player, 'reset_turn_state'): # Check if method exists
-                current_player.reset_turn_state()
-        print(f"Game started with {len(self.players)} players. Player 0's turn. Stage: MOVING")
+                current_player.reset_turn_state() # Player resets its own state (e.g., movement fuel)
+        print(f"Game started with {len(self.players)} players. Player 0's turn.")
 
     def next_turn(self) -> None:
         if not self.players or not self.running: return
         self.active_weapon = None
-        self.current_turn_stage = TurnStage.MOVING
+        # self.current_turn_stage = TurnStage.MOVING # REMOVE THIS
         
         original_index: int = self.current_player_index
         if not self.players:
@@ -106,7 +106,7 @@ class GameManager:
             if active_player.alive:
                 if hasattr(active_player, 'reset_turn_state'): # Check if method exists
                     active_player.reset_turn_state() 
-                print(f"Turn changed to Player {self.current_player_index}. Stage: MOVING")
+                print(f"Turn changed to Player {self.current_player_index}.")
                 return # Found next player
             # if self.current_player_index == original_index: # This check is implicitly handled by the loop limit
             #     break 
@@ -129,13 +129,13 @@ class GameManager:
     def get_winning_player(self) -> Optional[Player]:
         return self.winning_player
 
-    def switch_to_aiming_stage(self) -> None:
-        if self.current_turn_stage == TurnStage.MOVING:
-            self.current_turn_stage = TurnStage.AIMING
-            active_player = self.get_active_player()
-            if active_player:
-                active_player.stop_moving() 
-            print(f"Player {self.current_player_index} switched to AIMING stage.")
+    # def switch_to_aiming_stage(self) -> None: # REMOVE THIS METHOD
+    #     if self.current_turn_stage == TurnStage.MOVING:
+    #         self.current_turn_stage = TurnStage.AIMING
+    #         active_player = self.get_active_player()
+    #         if active_player:
+    #             active_player.stop_moving() 
+    #         print(f"Player {self.current_player_index} switched to AIMING stage.")
 
     def is_game_over(self) -> bool:
         # ... (current is_game_over logic seems mostly fine, ensure it correctly sets self.winner_team and self.winning_player) ...
@@ -208,13 +208,13 @@ class GameManager:
         if not self.running:
             return "GAME_ALREADY_ENDED" 
 
-        active_player = self.get_active_player()
-        if active_player and self.current_turn_stage == TurnStage.MOVING:
-            # Assuming Player has these attributes, set from config and updated during Player.move_left/right
-            if hasattr(active_player, 'distance_moved_this_turn') and \
-               hasattr(active_player, 'max_move_distance_per_turn'):
-                if active_player.distance_moved_this_turn >= active_player.max_move_distance_per_turn:
-                    self.switch_to_aiming_stage()
+        # active_player = self.get_active_player() # REMOVE STAGE SWITCHING LOGIC
+        # if active_player and self.current_turn_stage == TurnStage.MOVING:
+        #     # Assuming Player has these attributes, set from config and updated during Player.move_left/right
+        #     if hasattr(active_player, 'distance_moved_this_turn') and \
+        #        hasattr(active_player, 'max_move_distance_per_turn'):
+        #         if active_player.distance_moved_this_turn >= active_player.max_move_distance_per_turn:
+        #             self.switch_to_aiming_stage() # This method is removed
 
         if self.active_weapon:
             if self.terrain: # Ensure terrain is available for weapon update
@@ -260,9 +260,9 @@ class GameManager:
             print("Cannot fire: Weapon effect already in progress.")
             return
 
-        if self.current_turn_stage != TurnStage.AIMING:
-            print("Cannot fire: Not in aiming stage.")
-            return
+        # if self.current_turn_stage != TurnStage.AIMING: # REMOVE STAGE CHECK
+        #     print("Cannot fire: Not in aiming stage.")
+        #     return
 
         active_player = self.get_active_player()
         if not active_player:
