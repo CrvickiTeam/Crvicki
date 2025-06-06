@@ -6,7 +6,8 @@ from .terrain import Terrain, TerrainMap # Assuming TerrainMap might be used els
 from .player import Player, PlayerTeam 
 from .weapons.weapon import Weapon
 # from .weapons.basic_cannon import BasicCannon
-from .weapons.small_bomb import SmallBomb # Add this
+from .weapons.small_bomb import SmallBomb
+from .weapons.big_bomb import BigBomb # <<< ADD THIS IMPORT
 # from .weapons.sniper_rifle import SniperRifle # Future weapon
 # from .weapons.big_bomb_cannon import BigBombCannon # Future weapon
 # from .weapons.cluster_gun import ClusterGun # Future weapon
@@ -267,27 +268,25 @@ class GameManager:
 
     def execute_player_action(self, weapon_type_id: str, angle: float, power: float) -> None:
         if self.active_weapon:
-            # print("Cannot fire: Weapon effect already in progress.") # Optional: keep for debugging
+            # print("Cannot fire: Weapon effect already in progress.")
             return
 
         active_player = self.get_active_player()
         if not active_player:
-            # print("Cannot execute action: No active player.") # Optional: keep for debugging
+            # print("Cannot execute action: No active player.")
             return
 
         # print(f"Player {self.current_player_index} ({active_player.team.name}) executing action with {weapon_type_id}!")
         # print(f"  Angle: {angle:.2f} degrees, Power: {power:.2f}")
 
         weapon_instance: Optional[Weapon] = None
-        # if weapon_type_id == "basic_cannon":  # Old
-        #     weapon_instance = BasicCannon(owner=active_player, game_manager=self) 
-        if weapon_type_id == "small_bomb": # New - ensure this matches the string used in GameScene
+        if weapon_type_id == "small_bomb": 
             weapon_instance = SmallBomb(owner=active_player, game_manager=self)
+        elif weapon_type_id == "big_bomb": # <<< ADD THIS CASE
+            weapon_instance = BigBomb(owner=active_player, game_manager=self)
         # Add other weapon types here later:
         # elif weapon_type_id == "sniper_rifle":
         #     weapon_instance = SniperRifle(owner=active_player, game_manager=self)
-        # elif weapon_type_id == "big_bomb_cannon":
-        #     weapon_instance = BigBombCannon(owner=active_player, game_manager=self)
         # elif weapon_type_id == "cluster_gun":
         #     weapon_instance = ClusterGun(owner=active_player, game_manager=self)
         else:

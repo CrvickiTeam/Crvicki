@@ -22,7 +22,7 @@ class Weapon:
         self._is_finished = True 
 
         weapon_defaults_cfg = self.game_manager.config.get("game", {}).get("weapons", {}).get("defaults", {})
-        self.power_to_velocity_scale: float = float(weapon_defaults_cfg.get("power_to_velocity_scale", 5.0))
+        self.default_power_to_velocity_scale: float = float(weapon_defaults_cfg.get("power_to_velocity_scale", 5.0))
         self.default_projectile_gravity: float = float(weapon_defaults_cfg.get("projectile_gravity", 400.0))
         self.default_projectile_draw_size_radius: int = int(weapon_defaults_cfg.get("projectile_draw_size_radius", 5))
 
