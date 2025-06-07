@@ -1,15 +1,33 @@
 from __future__ import annotations
 import pygame 
 import math 
-import numpy as np # Added for create_explosion_gradient
-from typing import List, TYPE_CHECKING, Dict, Any, Optional, Tuple # Added Optional, Tuple, np
+import numpy as np
+from typing import List, TYPE_CHECKING, Dict, Any, Optional, Tuple
+from enum import Enum # <<< ADD Enum
 
 if TYPE_CHECKING:
     from ..player import Player
     from ..terrain import Terrain
     from ..game_manager import GameManager
-    # Projectile will be defined in this file, so no forward ref needed for it here if defined before Weapon
-    # However, if Weapon is defined first, or for clarity, it can be kept.
+
+class WeaponType(Enum): # <<< NEW ENUM
+    SMALL_BOMB = 0
+    BIG_BOMB = 1
+    SNIPER = 2
+    SALVO = 3
+    # Add more weapon types here in the future
+
+    def display_name(self) -> str:
+        return self.name.replace("_", " ").title()
+
+# Helper for ordered access, useful for UI and selection by number
+WEAPON_TYPES_ORDERED: List[WeaponType] = [
+    WeaponType.SMALL_BOMB,
+    WeaponType.BIG_BOMB,
+    WeaponType.SNIPER,
+    WeaponType.SALVO
+]
+
 
 # --- Base Weapon Class ---
 class Weapon:

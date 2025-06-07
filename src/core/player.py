@@ -1,17 +1,16 @@
-from typing import TYPE_CHECKING, Tuple, Optional, List, Dict, Any # Ensure all needed types are imported
-
+from typing import TYPE_CHECKING, Tuple, Optional, List, Dict, Any 
 import pygame
-from enum import Enum
+# from enum import Enum # PlayerTeam is already an Enum
 import os
 import math
 import numpy as np
-# from typing import TYPE_CHECKING # Already imported above
+from enum import Enum # <<< ADD Enum for PlayerTeam
 
-# Assuming Terrain and TerrainMaterial are importable if needed for type hints
-from .terrain import Terrain, TerrainMaterial # Make sure Terrain is imported
+from .terrain import Terrain, TerrainMaterial
+from .weapons.weapon import WeaponType, WEAPON_TYPES_ORDERED # <<< IMPORT WeaponType
 
 if TYPE_CHECKING:
-    from .game_manager import GameManager # Za type hinting, prepreči ciklični uvoz
+    from .game_manager import GameManager 
 
 class PlayerTeam(Enum):
     TEAM_1 = 1
@@ -19,14 +18,15 @@ class PlayerTeam(Enum):
 
 class Player:
     def __init__(self, start_pos: tuple[int, int], team: PlayerTeam, config: Dict[str, Any], game_manager: 'GameManager') -> None:
-        self.config: Dict[str, Any] = config
+        self.config: Dict[str, Any] = config # Ensure self.config is assigned early
+        # ... (rest of existing init code for team, game_manager, alive, x, y, angle, direction) ...
         self.team: PlayerTeam = team
         self.game_manager: 'GameManager' = game_manager 
         self.alive: bool = True
         
         self.x: float = float(start_pos[0])
         self.y: float = float(start_pos[1])
-        self.angle: float = 0.0
+        self.angle: float = 0.0 
         self.direction: int = 1 
 
         player_cfg: Dict[str, Any] = self.config.get("game", {}).get("player", {})
@@ -52,12 +52,17 @@ class Player:
         self.vx: float = 0.0
         self.vy: float = 0.0
         self.is_grounded: bool = False
-        self.is_moving: bool = False # Represents if player is *currently trying* to move via input
-        self.distance_moved_this_turn: float = 0.0 # Tracks fuel consumed
+        self.is_moving: bool = False 
+        self.distance_moved_this_turn: float = 0.0 
 
-        self.aim_angle: float = 45.0 if self.direction == 1 else 135.0
+        self.aim_angle: float = 45.0 if self.direction == 1 else 135.0 
         self.aim_power: float = self.default_aim_power
+        
+        self.inventory: Dict[WeaponType, int] = {}
+        self.selected_weapon_type: WeaponType = WeaponType.SMALL_BOMB 
+        self._initialize_inventory() # Call after self.config is set
 
+        # ... (rest of sprite loading and rect initialization) ...
         self.active_tank_image_orig: Optional[pygame.Surface] = None
         self.waiting_tank_image_orig: Optional[pygame.Surface] = None
         self.pipe_image_orig: Optional[pygame.Surface] = None
@@ -83,17 +88,93 @@ class Player:
                 self.height = base_img_h
         elif loaded_cfg_width is not None and loaded_cfg_height is not None:
             self.width = loaded_cfg_width
-            self.height = loaded_cfg_height
-
+        
         self.rect: pygame.Rect = pygame.Rect(0, 0, self.width, self.height)
         self.rect.center = (int(self.x), int(self.y))
 
+
+    def _initialize_inventory(self) -> None:
+        """Sets up the initial weapon counts for the player from config."""
+        player_config: Dict[str, Any] = self.config.get("game", {}).get("player", {})
+        inventory_config: Dict[str, int] = player_config.get("initial_inventory", {})
+        
+        self.inventory = {}
+        
+        # Iterate through all defined weapon types to ensure they are in the inventory
+        for weapon_type_enum_member in WeaponType:
+            weapon_name_str = weapon_type_enum_member.name # e.g., "SMALL_BOMB"
+            # Get quantity from config, default to 0 if not specified for this weapon type
+            quantity = inventory_config.get(weapon_name_str, 0) 
+            self.inventory[weapon_type_enum_member] = quantity
+            
+        # Ensure the default selected weapon is valid or fallback
+        if self.get_weapon_quantity(self.selected_weapon_type) == 0 and self.selected_weapon_type != WeaponType.SMALL_BOMB:
+             # If selected weapon has 0 ammo and isn't infinite small bomb, try to select small bomb
+            if self.get_weapon_quantity(WeaponType.SMALL_BOMB) != 0:
+                self.selected_weapon_type = WeaponType.SMALL_BOMB
+            else: # Fallback to first available weapon if small bomb also has 0 (unlikely with -1 default)
+                for wt in WEAPON_TYPES_ORDERED:
+                    if self.get_weapon_quantity(wt) != 0:
+                        self.selected_weapon_type = wt
+                        break
+        
+        print(f"Player {self.team.name} initialized inventory: {self.inventory}")
+
+    def get_selected_weapon_type(self) -> WeaponType:
+        return self.selected_weapon_type
+
+    def get_weapon_quantity(self, weapon_type: WeaponType) -> int:
+        return self.inventory.get(weapon_type, 0)
+
+    def get_weapon_quantity_display(self, weapon_type: WeaponType) -> str:
+        quantity = self.inventory.get(weapon_type, 0)
+        return "Inf" if quantity == -1 else str(quantity)
+
+    def select_weapon_by_index(self, index: int) -> bool:
+        """Selects a weapon by its order in WEAPON_TYPES_ORDERED. Returns True if selection changed."""
+        if 0 <= index < len(WEAPON_TYPES_ORDERED):
+            target_weapon = WEAPON_TYPES_ORDERED[index]
+            quantity = self.get_weapon_quantity(target_weapon)
+            if quantity != 0: # Can select if infinite (-1) or has ammo (>0)
+                if self.selected_weapon_type != target_weapon:
+                    self.selected_weapon_type = target_weapon
+                    print(f"Player {self.team.name} selected {target_weapon.display_name()}")
+                    return True
+        return False
+    
+    def consume_selected_weapon(self) -> bool:
+        """Decrements the count of the selected weapon if it's not infinite and has ammo. Returns True if weapon can be fired."""
+        quantity = self.get_weapon_quantity(self.selected_weapon_type)
+        if quantity == -1: # Infinite
+            return True
+        if quantity > 0:
+            self.inventory[self.selected_weapon_type] -= 1
+            print(f"{self.selected_weapon_type.display_name()} consumed. Remaining: {self.inventory[self.selected_weapon_type]}")
+            return True
+        print(f"Cannot fire {self.selected_weapon_type.display_name()}, no ammo.")
+        return False # No ammo
+
     def reset_turn_state(self) -> None:
-        """Resets player state at the beginning of their turn (e.g., movement fuel)."""
+        """Resets player's state at the beginning of their turn."""
         self.distance_moved_this_turn = 0.0
-        self.is_moving = False # Ensure movement intent is reset
-        self.vx = 0.0          # Ensure velocity is reset
-        # print(f"Player {self.team.name} turn state reset. Fuel remaining: {self.max_move_distance_per_turn - self.distance_moved_this_turn:.2f}")
+        self.is_moving = False 
+        self.vx = 0 # Stop horizontal movement from previous turn/physics
+        
+        # Default to SMALL_BOMB at the start of the turn
+        self.selected_weapon_type = WeaponType.SMALL_BOMB
+        
+        # Optional: Add a check to ensure Small Bomb is actually available,
+        # though with infinite Small Bombs, this is less critical.
+        # If Small Bomb somehow had 0 ammo, you might want to select the first available weapon.
+        if self.get_weapon_quantity(WeaponType.SMALL_BOMB) == 0:
+            # Fallback to the first available weapon in order if Small Bomb is (unexpectedly) out
+            for wt in WEAPON_TYPES_ORDERED:
+                if self.get_weapon_quantity(wt) != 0: # != 0 means > 0 or -1 (infinite)
+                    self.selected_weapon_type = wt
+                    break
+        
+        print(f"Player {self.team.name} turn reset. Selected weapon: {self.selected_weapon_type.display_name()}")
+
 
     def load_sprites(self) -> None:
         script_dir = os.path.dirname(__file__)

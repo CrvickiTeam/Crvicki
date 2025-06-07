@@ -1,17 +1,14 @@
 import pygame
-import numpy as np # Ensure numpy is imported
+import numpy as np 
 from typing import Dict, Any, Tuple, List, Optional
 
-from .terrain import Terrain, TerrainMap # Assuming TerrainMap might be used elsewhere
+from .terrain import Terrain, TerrainMap 
 from .player import Player, PlayerTeam 
-from .weapons.weapon import Weapon
-# from .weapons.basic_cannon import BasicCannon
+from .weapons.weapon import Weapon, WeaponType # <<< IMPORT WeaponType
 from .weapons.small_bomb import SmallBomb
 from .weapons.big_bomb import BigBomb
 from .weapons.sniper import Sniper
-from .weapons.salvo import Salvo # <<< ADD NEW IMPORT
-# from .weapons.big_bomb_cannon import BigBombCannon # Future weapon
-# from .weapons.cluster_gun import ClusterGun # Future weapon
+from .weapons.salvo import Salvo 
 
 
 class GameManager:
@@ -267,33 +264,28 @@ class GameManager:
         # then it would need its own clear logic.
         # Given the context of explosions, the gradient processing is the primary path.
 
-    def execute_player_action(self, weapon_type_id: str, angle: float, power: float) -> None:
+    def execute_player_action(self, weapon_type: WeaponType, angle: float, power: float) -> None: # <<< CHANGED type hint
         if self.active_weapon:
-            # print("Cannot fire: Weapon effect already in progress.")
             return
 
         active_player = self.get_active_player()
         if not active_player:
-            # print("Cannot execute action: No active player.")
             return
 
-        # print(f"Player {self.current_player_index} ({active_player.team.name}) executing action with {weapon_type_id}!")
+        print(f"Player {self.current_player_index} ({active_player.team.name}) executing action with {weapon_type.display_name()}!")
         # print(f"  Angle: {angle:.2f} degrees, Power: {power:.2f}")
 
         weapon_instance: Optional[Weapon] = None
-        if weapon_type_id == "small_bomb": 
+        if weapon_type == WeaponType.SMALL_BOMB: 
             weapon_instance = SmallBomb(owner=active_player, game_manager=self)
-        elif weapon_type_id == "big_bomb": 
+        elif weapon_type == WeaponType.BIG_BOMB: 
             weapon_instance = BigBomb(owner=active_player, game_manager=self)
-        elif weapon_type_id == "sniper": 
+        elif weapon_type == WeaponType.SNIPER: 
             weapon_instance = Sniper(owner=active_player, game_manager=self)
-        elif weapon_type_id == "salvo": # <<< NEW CHECK
+        elif weapon_type == WeaponType.SALVO: 
             weapon_instance = Salvo(owner=active_player, game_manager=self)
-        # Add other weapon types here later:
-        # elif weapon_type_id == "cluster_gun":
-        #     weapon_instance = ClusterGun(owner=active_player, game_manager=self)
         else:
-            print(f"Error: Unknown weapon type ID '{weapon_type_id}'. Cannot create weapon instance.")
+            print(f"Error: Unknown weapon type '{weapon_type}'. Cannot create weapon instance.")
             return 
 
         if weapon_instance:

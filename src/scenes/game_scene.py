@@ -2,8 +2,9 @@ import pygame
 from typing import Optional 
 
 from .scene import Scene
-from core.game_manager import GameManager # TurnStage removed from import
+from core.game_manager import GameManager 
 from core.player import Player 
+from core.weapons.weapon import WeaponType, WEAPON_TYPES_ORDERED # <<< IMPORT WeaponType
 
 class GameScene(Scene):
     """Game scene where the main gameplay occurs."""
@@ -18,12 +19,16 @@ class GameScene(Scene):
         self.game_controller: GameManager = self.manager.game_controller 
         
         try:
-            self.font: pygame.font.Font = pygame.font.Font(None, 36)
+            self.font: pygame.font.Font = pygame.font.Font(None, 30) # Slightly smaller for inventory
+            self.ui_font: pygame.font.Font = pygame.font.Font(None, 24) # For weapon names/ammo
         except pygame.error:
             print("Warning: Default font not found. Using fallback.")
-            self.font = pygame.font.SysFont("arial", 36)
+            self.font = pygame.font.SysFont("arial", 30)
+            self.ui_font = pygame.font.SysFont("arial", 24)
         self.game_time_seconds: float = 0.0
         self.text_color: tuple[int, int, int] = (255, 255, 255)
+        self.selected_weapon_color: tuple[int, int, int] = (255, 255, 0) # Yellow
+        self.disabled_weapon_color: tuple[int, int, int] = (100, 100, 100) # Grey
 
     def reset_timer(self) -> None:
         self.game_time_seconds = 0.0
@@ -34,14 +39,22 @@ class GameScene(Scene):
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_ESCAPE:
                 self.manager.switch_scene("PAUSE_MENU")
-            elif event.key == pygame.K_SPACE:
-                if active_player: # Ensure there's an active player
-                    # if self.game_controller.current_turn_stage == TurnStage.MOVING: # REMOVE
-                    #     self.game_controller.switch_to_aiming_stage() # REMOVE
-                    # elif self.game_controller.current_turn_stage == TurnStage.AIMING: # REMOVE
-                    angle, power = active_player.get_shot_info()
-                    # Use a default weapon ID or implement weapon selection
-                    self.game_controller.execute_player_action("small_bomb", angle, power)
+            elif active_player and not self.game_controller.active_weapon: # Only allow actions if it's player's turn and no weapon active
+                if event.key == pygame.K_SPACE:
+                    selected_weapon = active_player.get_selected_weapon_type()
+                    # Player.consume_selected_weapon now returns bool if fireable
+                    if active_player.consume_selected_weapon(): 
+                        angle, power = active_player.get_shot_info()
+                        self.game_controller.execute_player_action(selected_weapon, angle, power)
+                elif event.key == pygame.K_1:
+                    active_player.select_weapon_by_index(0)
+                elif event.key == pygame.K_2:
+                    active_player.select_weapon_by_index(1)
+                elif event.key == pygame.K_3:
+                    active_player.select_weapon_by_index(2)
+                elif event.key == pygame.K_4:
+                    active_player.select_weapon_by_index(3)
+                # Add K_5, K_6 etc. if more weapons
 
     def update(self, dt: float) -> None:
         keys: pygame.key.ScancodeWrapper = pygame.key.get_pressed() 
@@ -80,6 +93,28 @@ class GameScene(Scene):
             print("GameScene: Detected GAME_OVER, switching to WIN_MENU.")
             self.manager.switch_scene("WIN_MENU")
 
+    def _draw_inventory_ui(self, screen: pygame.Surface, active_player: Optional[Player]) -> None:
+        if not active_player or not self.ui_font:
+            return
+
+        start_x = 20
+        start_y = 60 # Below player turn text
+        line_height = 25
+        
+        for i, weapon_type in enumerate(WEAPON_TYPES_ORDERED):
+            name = f"{i+1}. {weapon_type.display_name()}"
+            quantity_str = active_player.get_weapon_quantity_display(weapon_type)
+            text = f"{name}: {quantity_str}"
+            
+            color = self.text_color
+            if active_player.get_selected_weapon_type() == weapon_type:
+                color = self.selected_weapon_color
+            elif active_player.get_weapon_quantity(weapon_type) == 0: # Not -1 (infinite)
+                color = self.disabled_weapon_color
+            
+            text_surface = self.ui_font.render(text, True, color)
+            screen.blit(text_surface, (start_x, start_y + i * line_height))
+
     def draw(self, screen: pygame.Surface) -> None:
         screen.fill(self.sky_color) 
         self.game_controller.draw_components(screen)
@@ -87,6 +122,7 @@ class GameScene(Scene):
         if not self.font: 
             return
 
+        # Timer
         minutes: int = int(self.game_time_seconds // 60)
         seconds: int = int(self.game_time_seconds % 60)
         timer_text_str: str = f"{minutes:02d}:{seconds:02d}"
@@ -94,19 +130,14 @@ class GameScene(Scene):
         timer_rect: pygame.Rect = timer_surface.get_rect(center=(screen.get_width() // 2, 30))
         screen.blit(timer_surface, timer_rect)
 
+        # Player Turn
         active_player_display_index: int = self.game_controller.current_player_index + 1
         player_turn_text_str: str = f"Player {active_player_display_index}'s turn"
         player_turn_surface: pygame.Surface = self.font.render(player_turn_text_str, True, self.text_color)
         player_turn_rect: pygame.Rect = player_turn_surface.get_rect(topleft=(20, 20))
         screen.blit(player_turn_surface, player_turn_rect)
 
-        # stage_text_str: str = "" # REMOVE STAGE DISPLAY
-        # if self.game_controller.current_turn_stage == TurnStage.MOVING:
-        #     stage_text_str = "Moving stage"
-        # elif self.game_controller.current_turn_stage == TurnStage.AIMING:
-        #     stage_text_str = "Shooting stage"
-        
-        # if stage_text_str:
-        #     stage_surface: pygame.Surface = self.font.render(stage_text_str, True, self.text_color)
-        #     stage_rect: pygame.Rect = stage_surface.get_rect(topleft=(20, player_turn_rect.bottom + 5))
-        #     screen.blit(stage_surface, stage_rect)
+        # Inventory UI
+        active_player: Optional[Player] = self.game_controller.get_active_player()
+        if active_player and not self.game_controller.active_weapon: # Show inventory only during player's control phase
+            self._draw_inventory_ui(screen, active_player)

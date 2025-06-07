@@ -60,7 +60,13 @@
                 "angle_change_rate": 60.0,
                 "power_change_rate": 50.0
             },
-            "max_health": 100
+            "max_health": 100,
+            "initial_inventory": {
+                "SMALL_BOMB": -1,
+                "BIG_BOMB": 2,
+                "SNIPER": 2,
+                "SALVO": 2
+            }
         },
         "weapons": {
             "defaults": {
@@ -87,7 +93,7 @@
                 "shot_delay": 0.07,
                 "angle_spread": 2.5,
                 "power_spread_percentage": 0.1,
-                "explosion_radius": 30,
+                "explosion_radius": 25,
                 "center_damage": 10,
                 "projectile_draw_size_radius": 4
             }
