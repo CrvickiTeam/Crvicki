@@ -46,12 +46,12 @@
             "movement": {
                 "drive_speed": 100.0,
                 "gravity": 400.0,
-                "step_height": 5,
-                "max_move_distance_per_turn": 150.0
+                "step_height": 8,
+                "max_move_distance_per_turn": 200.0
             },
             "hitbox": {
-                "width": 20,
-                "height": 20
+                "width": 40,
+                "height": 40
             },
             "aiming": {
                 "min_power": 10.0,
@@ -77,11 +77,11 @@
                 "projectile_draw_size_radius": 5
             },
             "small_bomb": {
-                "explosion_radius": 25,
+                "explosion_radius": 30,
                 "center_damage": 25
             },
             "big_bomb": {
-                "explosion_radius": 50,
+                "explosion_radius": 60,
                 "center_damage": 50,
                 "projectile_draw_size_radius": 7
             },
@@ -95,7 +95,7 @@
                 "shot_delay": 0.07,
                 "angle_spread": 2.5,
                 "power_spread_percentage": 0.1,
-                "explosion_radius": 25,
+                "explosion_radius": 30,
                 "center_damage": 10,
                 "projectile_draw_size_radius": 4
             }
