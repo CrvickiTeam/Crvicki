@@ -58,7 +58,9 @@
                 "max_power": 135.0,
                 "default_power": 50.0,
                 "angle_change_rate": 60.0,
-                "power_change_rate": 50.0
+                "power_change_rate": 50.0,
+                "max_up_degrees": 90.0,
+                "min_down_degrees_offset": -10.0
             },
             "max_health": 100,
             "initial_inventory": {

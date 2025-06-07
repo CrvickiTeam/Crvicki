@@ -1,13 +1,12 @@
 from typing import TYPE_CHECKING, Tuple, Optional, List, Dict, Any 
 import pygame
-# from enum import Enum # PlayerTeam is already an Enum
 import os
 import math
 import numpy as np
-from enum import Enum # <<< ADD Enum for PlayerTeam
+from enum import Enum
 
 from .terrain import Terrain, TerrainMaterial
-from .weapons.weapon import WeaponType, WEAPON_TYPES_ORDERED # <<< IMPORT WeaponType
+from .weapons.weapon import WeaponType, WEAPON_TYPES_ORDERED
 
 if TYPE_CHECKING:
     from .game_manager import GameManager 
@@ -17,9 +16,12 @@ class PlayerTeam(Enum):
     TEAM_2 = 2
 
 class Player:
+    # REMOVE Class attributes:
+    # AIM_MAX_UP_DEGREES = 90.0
+    # AIM_MIN_DOWN_DEGREES_OFFSET = -10.0
+
     def __init__(self, start_pos: tuple[int, int], team: PlayerTeam, config: Dict[str, Any], game_manager: 'GameManager') -> None:
-        self.config: Dict[str, Any] = config # Ensure self.config is assigned early
-        # ... (rest of existing init code for team, game_manager, alive, x, y, angle, direction) ...
+        self.config: Dict[str, Any] = config
         self.team: PlayerTeam = team
         self.game_manager: 'GameManager' = game_manager 
         self.alive: bool = True
@@ -27,7 +29,9 @@ class Player:
         self.x: float = float(start_pos[0])
         self.y: float = float(start_pos[1])
         self.angle: float = 0.0 
+        
         self.direction: int = 1 
+        self.aim_angle: float = 45.0 
 
         player_cfg: Dict[str, Any] = self.config.get("game", {}).get("player", {})
         movement_cfg: Dict[str, Any] = player_cfg.get("movement", {})
@@ -40,55 +44,58 @@ class Player:
         self.max_move_distance_per_turn: float = float(movement_cfg.get("max_move_distance_per_turn", 150.0)) 
         self.health: int = int(player_cfg.get("max_health", 100))
 
-        self.width: int = int(hitbox_cfg.get("width", 20))
-        self.height: int = int(hitbox_cfg.get("height", 20))
+        self.width: int = int(hitbox_cfg.get("width", 20)) 
+        self.height: int = int(hitbox_cfg.get("height", 20)) 
 
         self.aim_angle_rate: float = float(aiming_cfg.get("angle_change_rate", 60.0))
         self.aim_power_rate: float = float(aiming_cfg.get("power_change_rate", 50.0))
         self.min_aim_power: float = float(aiming_cfg.get("min_power", 10.0))
         self.max_aim_power: float = float(aiming_cfg.get("max_power", 135.0))
         self.default_aim_power: float = float(aiming_cfg.get("default_power", 50.0))
+        self.aim_power: float = self.default_aim_power
+
+        # Load aiming angle limits from config
+        self.aim_max_up_degrees: float = float(aiming_cfg.get("max_up_degrees", 90.0)) # <<< NEW
+        self.aim_min_down_degrees_offset: float = float(aiming_cfg.get("min_down_degrees_offset", -10.0)) # <<< NEW
+
 
         self.vx: float = 0.0
         self.vy: float = 0.0
         self.is_grounded: bool = False
         self.is_moving: bool = False 
         self.distance_moved_this_turn: float = 0.0 
-
-        self.aim_angle: float = 45.0 if self.direction == 1 else 135.0 
-        self.aim_power: float = self.default_aim_power
         
         self.inventory: Dict[WeaponType, int] = {}
         self.selected_weapon_type: WeaponType = WeaponType.SMALL_BOMB 
-        self._initialize_inventory() # Call after self.config is set
+        self._initialize_inventory()
 
-        # ... (rest of sprite loading and rect initialization) ...
         self.active_tank_image_orig: Optional[pygame.Surface] = None
         self.waiting_tank_image_orig: Optional[pygame.Surface] = None
         self.pipe_image_orig: Optional[pygame.Surface] = None
-        self.load_sprites()
+        self.load_sprites() # This will load and potentially set initial width/height from sprites
 
+        # If config specifies dimensions, use them to scale sprites
+        # This logic seems to be what you had: load sprites, then if config has w/h, scale them.
         loaded_cfg_width: Optional[int] = hitbox_cfg.get("width")
         loaded_cfg_height: Optional[int] = hitbox_cfg.get("height")
 
-        if self.active_tank_image_orig:
-            base_img_w: int = self.active_tank_image_orig.get_width()
-            base_img_h: int = self.active_tank_image_orig.get_height()
-
+        if self.active_tank_image_orig: # Check if sprite loaded
+            # If config provides dimensions, scale the loaded sprite and update self.width/height
             if loaded_cfg_width is not None and loaded_cfg_height is not None:
                 self.width = loaded_cfg_width
                 self.height = loaded_cfg_height
-                self.active_tank_image_orig = pygame.transform.scale(self.active_tank_image_orig,
-                                                                     (self.width, self.height))
+                self.active_tank_image_orig = pygame.transform.scale(self.active_tank_image_orig, (self.width, self.height))
                 if self.waiting_tank_image_orig:
-                    self.waiting_tank_image_orig = pygame.transform.scale(self.waiting_tank_image_orig,
-                                                                          (self.width, self.height))
-            else:
-                self.width = base_img_w
-                self.height = base_img_h
+                    self.waiting_tank_image_orig = pygame.transform.scale(self.waiting_tank_image_orig, (self.width, self.height))
+            else: # Otherwise, use the sprite's own dimensions
+                self.width = self.active_tank_image_orig.get_width()
+                self.height = self.active_tank_image_orig.get_height()
         elif loaded_cfg_width is not None and loaded_cfg_height is not None:
+            # No sprite, but config has dimensions (e.g., for placeholder)
             self.width = loaded_cfg_width
-        
+            self.height = loaded_cfg_height
+        # else self.width/height remain the initial defaults from hitbox_cfg if no sprite and no specific w/h in cfg
+
         self.rect: pygame.Rect = pygame.Rect(0, 0, self.width, self.height)
         self.rect.center = (int(self.x), int(self.y))
 
@@ -216,49 +223,64 @@ class Player:
                                                           pygame.SRCALPHA)  # Zagotovi pozitivne dimenzije
                     self.pipe_image_orig.fill((255, 0, 255, 128))
 
+    # --- Movement ---
     def move_left(self) -> None:
-        """Sets the player's horizontal velocity to move left, if fuel is available."""
+        old_direction = self.direction
+        self.direction = -1
+
+        if old_direction != self.direction: # If direction actually changed
+            # Mirror the aim_angle to maintain its visual orientation relative to the world
+            self.aim_angle = 180.0 - self.aim_angle
+            # The existing aim_up/aim_down methods will clamp this to valid ranges for the new direction
+
         if self.distance_moved_this_turn < self.max_move_distance_per_turn:
+            self.is_moving = True
             self.vx = -self.speed
-            self.is_moving = True # Player is attempting to move
-            if self.direction == 1: # If facing right, turn left
-                self.direction = -1
-                self.aim_angle = 135.0 
         else:
-            self.stop_moving() # No fuel left
+            # No fuel to initiate movement, ensure player is not set to move
+            self.vx = 0
+            self.is_moving = False 
 
     def move_right(self) -> None:
-        """Sets the player's horizontal velocity to move right, if fuel is available."""
+        old_direction = self.direction
+        self.direction = 1
+
+        if old_direction != self.direction: # If direction actually changed
+            # Mirror the aim_angle to maintain its visual orientation relative to the world
+            self.aim_angle = 180.0 - self.aim_angle
+            # The existing aim_up/aim_down methods will clamp this to valid ranges for the new direction
+
         if self.distance_moved_this_turn < self.max_move_distance_per_turn:
+            self.is_moving = True
             self.vx = self.speed
-            self.is_moving = True # Player is attempting to move
-            if self.direction == -1: # If facing left, turn right
-                self.direction = 1
-                self.aim_angle = 45.0
         else:
-            self.stop_moving() # No fuel left
+            # No fuel to initiate movement, ensure player is not set to move
+            self.vx = 0
+            self.is_moving = False
 
     def stop_moving(self) -> None:
-        """Stops the player's horizontal movement."""
+        self.is_moving = False
         self.vx = 0.0
-        self.is_moving = False # Player is no longer attempting to move via input
 
-    # --- Aiming Methods ---
+    # --- Aiming ---
+    # (Your existing aim_up, aim_down, increase_power, decrease_power methods remain unchanged)
+    # Make sure they use self.aim_max_up_degrees and self.aim_min_down_degrees_offset from config
     def aim_up(self, dt: float) -> None:
         if self.direction == 1: # Facing right
-            self.aim_angle += self.aim_angle_rate * dt # Use instance attribute
-            self.aim_angle = min(self.aim_angle, 180.0)
+            self.aim_angle += self.aim_angle_rate * dt 
+            self.aim_angle = min(self.aim_angle, self.aim_max_up_degrees) 
         else: # Facing left
-            self.aim_angle -= self.aim_angle_rate * dt # Use instance attribute
-            self.aim_angle = max(self.aim_angle, 0.0)
+            self.aim_angle -= self.aim_angle_rate * dt 
+            self.aim_angle = max(self.aim_angle, self.aim_max_up_degrees) 
 
     def aim_down(self, dt: float) -> None:
         if self.direction == 1: # Facing right
-            self.aim_angle -= self.aim_angle_rate * dt # Use instance attribute
-            self.aim_angle = max(self.aim_angle, 0.0)
+            self.aim_angle -= self.aim_angle_rate * dt 
+            self.aim_angle = max(self.aim_angle, self.aim_min_down_degrees_offset) 
         else: # Facing left
-            self.aim_angle += self.aim_angle_rate * dt # Use instance attribute
-            self.aim_angle = min(self.aim_angle, 180.0)
+            self.aim_angle += self.aim_angle_rate * dt 
+            max_down_angle_left_facing = 180.0 - self.aim_min_down_degrees_offset 
+            self.aim_angle = min(self.aim_angle, max_down_angle_left_facing)
 
     def increase_power(self, dt: float) -> None:
         self.aim_power += self.aim_power_rate * dt # Use instance attribute

@@ -69,7 +69,7 @@ class GameScene(Scene):
             active_player: Optional[Player] = self.game_controller.get_active_player()
             if active_player and not self.game_controller.active_weapon: 
                 
-                moved_this_frame_input = False # Track if A or D was pressed this frame
+                moved_this_frame_input = False 
                 if keys[pygame.K_a]:
                     active_player.move_left()
                     moved_this_frame_input = True
@@ -77,12 +77,21 @@ class GameScene(Scene):
                     active_player.move_right()
                     moved_this_frame_input = True
                 
-                if not moved_this_frame_input: # If neither A nor D is pressed
-                    active_player.stop_moving() # Tell the player to stop
+                if not moved_this_frame_input: 
+                    active_player.stop_moving() 
                 
-                # Aiming input
-                if keys[pygame.K_LEFT]: active_player.aim_up(dt)
-                elif keys[pygame.K_RIGHT]: active_player.aim_down(dt)
+                # --- Modified Aiming Logic ---
+                if keys[pygame.K_LEFT]: # Pressing "left arrow" key
+                    if active_player.direction == 1: # Player is facing right
+                        active_player.aim_up(dt) # Decrease angle (aims "up" or counter-clockwise)
+                    else: # Player is facing left (direction == -1)
+                        active_player.aim_down(dt) # Increase angle (aims "down" or clockwise, relative to player)
+                elif keys[pygame.K_RIGHT]: # Pressing "right arrow" key
+                    if active_player.direction == 1: # Player is facing right
+                        active_player.aim_down(dt) # Increase angle (aims "down" or clockwise)
+                    else: # Player is facing left (direction == -1)
+                        active_player.aim_up(dt) # Decrease angle (aims "up" or counter-clockwise, relative to player)
+                # --- End Modified Aiming Logic ---
                 
                 if keys[pygame.K_UP]: active_player.increase_power(dt)
                 elif keys[pygame.K_DOWN]: active_player.decrease_power(dt)
@@ -92,7 +101,7 @@ class GameScene(Scene):
         if game_status == "GAME_OVER":
             print("GameScene: Detected GAME_OVER, switching to WIN_MENU.")
             self.manager.switch_scene("WIN_MENU")
-
+    
     def _draw_inventory_ui(self, screen: pygame.Surface, active_player: Optional[Player]) -> None:
         if not active_player or not self.ui_font:
             return

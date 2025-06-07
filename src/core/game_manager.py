@@ -4,7 +4,7 @@ from typing import Dict, Any, Tuple, List, Optional
 
 from .terrain import Terrain, TerrainMap 
 from .player import Player, PlayerTeam 
-from .weapons.weapon import Weapon, WeaponType # <<< IMPORT WeaponType
+from .weapons.weapon import Weapon, WeaponType 
 from .weapons.small_bomb import SmallBomb
 from .weapons.big_bomb import BigBomb
 from .weapons.sniper import Sniper
@@ -12,9 +12,9 @@ from .weapons.salvo import Salvo
 
 
 class GameManager:
-    def __init__(self, config: Dict[str, Any]) -> None: # Type hint for config
+    def __init__(self, config: Dict[str, Any]) -> None: 
         self.config: Dict[str, Any] = config
-        self.terrain: Optional[Terrain] = None # Terrain can be None initially
+        self.terrain: Optional[Terrain] = None 
         self.players: List[Player] = []
         self.current_player_index: int = 0
         self.running: bool = False
@@ -23,31 +23,38 @@ class GameManager:
         self.winning_player: Optional[Player] = None 
         # self.current_turn_stage: TurnStage = TurnStage.MOVING # REMOVE THIS ATTRIBUTE
 
-    def start_new_game(self, map_type: TerrainMap) -> None: # Renamed map to map_type for clarity
-        self.terrain = Terrain(map_type, self.config)
+    def start_new_game(self, map_type: TerrainMap) -> None: 
+        self.terrain = Terrain(map_type, self.config) # Terrain is initialized here
+        # Ensure terrain generation happens if it's not in Terrain.__init__
+        if hasattr(self.terrain, 'generate_terrain') and callable(getattr(self.terrain, 'generate_terrain')):
+            self.terrain.generate_terrain()
+
         self.players = []
         self.winner_team = None 
         self.winning_player = None 
         
         game_settings: Dict[str, Any] = self.config.get('game_settings', {})
         player_count: int = game_settings.get('player_count', 2)
-        game_mode: str = game_settings.get('game_mode', "FFA")
+        game_mode: str = game_settings.get('game_mode', "FFA") # Not directly used for direction logic
 
+        # spawn_y from your original snippet
         spawn_y: int = 150 
 
         player_spawn_positions: List[Tuple[int, int]] = []
         player_teams: List[PlayerTeam] = []
 
-        # Player spawning logic (current code seems fine, ensure terrain width is available)
-        if self.terrain:
+        # Player spawning logic from your original snippet
+        if self.terrain and self.terrain.width > 0: # Check if terrain and its width are valid
             terrain_width = self.terrain.width
+            mid_point_x = terrain_width / 2.0 # Calculate midpoint for direction logic
+
             if player_count == 4:
                 base_offset = terrain_width // 5
                 player_spawn_positions = [
                     (base_offset, spawn_y), (base_offset * 2, spawn_y),
                     (base_offset * 3, spawn_y), (base_offset * 4, spawn_y)
                 ]
-                player_teams = [PlayerTeam.TEAM_1, PlayerTeam.TEAM_2, PlayerTeam.TEAM_1, PlayerTeam.TEAM_2] if game_mode == "TEAMS" else [PlayerTeam.TEAM_1, PlayerTeam.TEAM_2, PlayerTeam.TEAM_1, PlayerTeam.TEAM_2]
+                player_teams = [PlayerTeam.TEAM_1, PlayerTeam.TEAM_2, PlayerTeam.TEAM_1, PlayerTeam.TEAM_2] # Simplified, adjust if TEAMS mode has specific order
             elif player_count == 3:
                 player_spawn_positions = [
                     (200, spawn_y), (terrain_width // 2, spawn_y), (terrain_width - 200, spawn_y)
@@ -59,32 +66,53 @@ class GameManager:
                 ]
                 player_teams = [PlayerTeam.TEAM_1, PlayerTeam.TEAM_2]
             else: 
+                # Fallback for unsupported player_count, defaulting to 2 players
+                print(f"Warning: Unsupported player_count {player_count}. Defaulting to 2 players.")
                 player_spawn_positions = [
                     (200, spawn_y), (terrain_width - 200, spawn_y)
                 ]
                 player_teams = [PlayerTeam.TEAM_1, PlayerTeam.TEAM_2]
-                player_count = 2
-        else: # Fallback if terrain is not initialized (should not happen in normal flow)
-            print("Error: Terrain not initialized in start_new_game.")
+                player_count = 2 # Ensure player_count reflects the actual number for the loop
+
+            # Create players
+            for i in range(player_count): # Iterate based on the (potentially adjusted) player_count
+                if i >= len(player_spawn_positions) or i >= len(player_teams):
+                    print(f"Warning: Not enough spawn positions or teams defined for player index {i}. Skipping.")
+                    continue
+
+                pos = player_spawn_positions[i]
+                team = player_teams[i]
+                
+                # Create player instance (assuming Player constructor is Player(pos, team, config, self))
+                player = Player(pos, team, self.config, self) 
+                
+                # <<< SET DIRECTION AND AIM ANGLE BASED ON SPAWN POSITION >>>
+                if pos[0] >= mid_point_x:
+                    player.direction = -1
+                    player.aim_angle = 135.0 # Standard aim angle for facing left
+                else:
+                    player.direction = 1
+                    player.aim_angle = 45.0  # Standard aim angle for facing right
+                
+                self.players.append(player)
+        else:
+            print("Error: Terrain not initialized or terrain width is zero in start_new_game. Cannot spawn players.")
+            self.running = False # Prevent game from running if setup fails
             return
-
-
-        for i in range(len(player_spawn_positions)):
-            pos = player_spawn_positions[i]
-            team = player_teams[i]
-            # Assuming Player class constructor signature is (start_pos, team, config, game_manager)
-            player = Player(pos, team, self.config, self) 
-            self.players.append(player)
 
         self.current_player_index = 0
         self.active_weapon = None
         self.running = True
-        # self.current_turn_stage = TurnStage.MOVING # REMOVE THIS
-        if self.players: # Ensure players list is not empty
-            current_player = self.players[self.current_player_index]
-            if hasattr(current_player, 'reset_turn_state'): # Check if method exists
-                current_player.reset_turn_state() # Player resets its own state (e.g., movement fuel)
-        print(f"Game started with {len(self.players)} players. Player 0's turn.")
+        
+        if self.players:
+            active_player = self.players[self.current_player_index]
+            if hasattr(active_player, 'reset_turn_state'):
+                active_player.reset_turn_state()
+            print(f"Game started with {len(self.players)} players. Player {self.current_player_index + 1}'s turn ({active_player.team.name}). Facing: {active_player.direction}")
+        else:
+            print("Error: No players were created. Game cannot start.")
+            self.running = False
+            return
 
     def next_turn(self) -> None:
         if not self.players or not self.running: return
