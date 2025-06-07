@@ -264,6 +264,8 @@ class GameManager:
         
         effect_gradient_array: Optional[np.ndarray] = impact_data.get('effect_gradient')
         gradient_origin_offset: Optional[Tuple[int, int]] = impact_data.get('gradient_origin') 
+        directly_hit_player: Optional[Player] = impact_data.get('directly_hit_player') # <<< NEW
+        configured_center_damage: int = impact_data.get('configured_center_damage', 0) # <<< NEW
         
         # --- Terrain Destruction ---
         if self.terrain and effect_gradient_array is not None and gradient_origin_offset is not None:
@@ -273,13 +275,16 @@ class GameManager:
                 self.terrain.destroy_terrain(gradient_origin_offset, effect_gradient_array)
         
         # --- Player Damage ---
-        # Player.process_explosion_damage will be called for each player
         if effect_gradient_array is not None and gradient_origin_offset is not None and effect_gradient_array.size > 0:
-            owner_player: Optional[Player] = impact_data.get('owner')
-            for player in self.players:
-                if player.alive: # Ensure player is alive before processing damage
-                    # Player class has process_explosion_damage which internally calls apply_damage
-                    player.process_explosion_damage(gradient_origin_offset, effect_gradient_array)
+            # owner_player: Optional[Player] = impact_data.get('owner') # owner_player not directly used here
+            for player_to_damage in self.players: # Renamed 'player' to 'player_to_damage'
+                if player_to_damage.alive: 
+                    player_to_damage.process_explosion_damage(
+                        gradient_origin_offset, 
+                        effect_gradient_array,
+                        directly_hit_player, # <<< PASSING NEW ARG
+                        configured_center_damage # <<< PASSING NEW ARG
+                    )
         
         # This section for 'damage_values' was an alternative system.
         # Based on your player.py, the process_explosion_damage method is the primary way players take damage from explosions.

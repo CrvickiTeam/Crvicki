@@ -82,7 +82,7 @@ class Projectile:
     def __init__(self, start_pos: tuple[float, float], initial_vx: float, initial_vy: float, owner: 'Player',
                  game_manager: 'GameManager', 
                  explosion_radius: int,
-                 center_damage: int,
+                 center_damage: int, # This is the configured center damage for the weapon
                  gravity: float,
                  draw_size_radius: int):
         self.x, self.y = start_pos
@@ -92,13 +92,13 @@ class Projectile:
         self.game_manager = game_manager 
         self._finished = False 
         self._impact_data: Optional[Dict[str, Any]] = None
+        self.directly_hit_player_this_frame: Optional[Player] = None # <<< NEW: To store directly hit player
 
         self.gravity: float = gravity
-        self.draw_size_radius: int = draw_size_radius # This will be used as collision radius
+        self.draw_size_radius: int = draw_size_radius 
         self.explosion_radius = explosion_radius
-        self.gradient_center_strength = center_damage
+        self.gradient_center_strength = center_damage # This is the configured center_damage
 
-        # Load sub-stepping parameters from config defaults
         weapon_defaults_cfg = self.game_manager.config.get("game", {}).get("weapons", {}).get("defaults", {})
         self.sub_step_radius_factor: float = float(weapon_defaults_cfg.get("sub_step_radius_factor", 0.5))
         self.min_sub_step_size: float = float(weapon_defaults_cfg.get("min_sub_step_size", 1.0))
@@ -108,6 +108,8 @@ class Projectile:
     def update(self, dt: float, terrain: 'Terrain'): 
         if self._finished:
             return
+        
+        self.directly_hit_player_this_frame = None # <<< NEW: Reset for the frame
 
         # --- Sub-Stepping for Collision Detection ---
         total_dx = self.vx * dt
@@ -142,19 +144,18 @@ class Projectile:
         current_sub_step_y = self.y
 
         for i in range(num_sub_steps):
-            if i > 0 or (num_sub_steps == 1 and (total_dx !=0 or total_dy !=0) ): # For the first step of multi-step, or the single step if it involves movement
+            if i > 0 or (num_sub_steps == 1 and (total_dx !=0 or total_dy !=0) ): 
                 current_sub_step_x += sub_dx
                 current_sub_step_y += sub_dy
             
             proj_cx_check: float = current_sub_step_x
             proj_cy_check: float = current_sub_step_y
 
-            # Check collision with players at current sub-step position
-            for player in self.game_manager.players:
-                if player is not self.owner and player.alive:
-                    player_cx: float = player.x
-                    player_cy: float = player.y
-                    player_radius: float = player.radius
+            for player_target in self.game_manager.players: # Renamed 'player' to 'player_target' to avoid conflict
+                if player_target is not self.owner and player_target.alive:
+                    player_cx: float = player_target.x
+                    player_cy: float = player_target.y
+                    player_radius: float = player_target.radius
                     projectile_collision_radius: float = float(self.draw_size_radius)
                     dx_p: float = proj_cx_check - player_cx
                     dy_p: float = proj_cy_check - player_cy
@@ -164,10 +165,11 @@ class Projectile:
 
                     if distance_squared_p < sum_radii_squared_p:
                         collided_this_frame = True
+                        self.directly_hit_player_this_frame = player_target # <<< NEW: Store hit player
                         impact_position = (int(proj_cx_check), int(proj_cy_check)) 
-                        self.x = proj_cx_check # Set final position to impact point
+                        self.x = proj_cx_check 
                         self.y = proj_cy_check
-                        print(f"Projectile hit player {player.team.name} during sub-step.")
+                        print(f"Projectile hit player {player_target.team.name} during sub-step.")
                         break 
             if collided_this_frame:
                 break # Exit sub-step loop if player hit
@@ -217,14 +219,16 @@ class Projectile:
                 clamped_impact_x, 
                 clamped_impact_y,
                 self.explosion_radius,
-                self.gradient_center_strength
+                self.gradient_center_strength 
             )
             self._impact_data = {
                 'gradient_origin': (gradient_start_x, gradient_start_y),
                 'effect_gradient': effect_gradient_array,
                 'owner': self.owner,
                 'explosion_center': (clamped_impact_x, clamped_impact_y),
-                'explosion_radius': self.explosion_radius
+                'explosion_radius': self.explosion_radius,
+                'directly_hit_player': self.directly_hit_player_this_frame, # <<< NEW
+                'configured_center_damage': self.gradient_center_strength   # <<< NEW (using existing attribute)
             }
 
     def draw(self, screen: pygame.Surface):

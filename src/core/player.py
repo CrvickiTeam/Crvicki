@@ -565,17 +565,19 @@ class Player:
             self.alive = False
             self.game_manager.is_game_over() 
 
-    def process_explosion_damage(self, gradient_origin: Tuple[int, int], damage_gradient: np.ndarray) -> None:
+    def process_explosion_damage(self, 
+                                 gradient_origin: Tuple[int, int], 
+                                 damage_gradient: np.ndarray,
+                                 directly_hit_player_from_impact: Optional['Player'], # <<< NEW ARG
+                                 weapon_configured_center_damage: int # <<< NEW ARG
+                                 ) -> None:
         if not self.alive or damage_gradient is None or damage_gradient.size == 0:
             return
 
         max_damage_taken = 0
         radius_sq = self.radius * self.radius
 
-        # Iterate over the grid cells covered by the explosion gradient
         grad_rows, grad_cols = damage_gradient.shape
-        
-        # Determine the bounding box of the circle in the gradient's local coordinates
         circle_center_in_grad_x = self.x - gradient_origin[0]
         circle_center_in_grad_y = self.y - gradient_origin[1]
 
@@ -584,20 +586,26 @@ class Player:
         min_gy = max(0, int(circle_center_in_grad_y - self.radius))
         max_gy = min(grad_rows - 1, int(circle_center_in_grad_y + self.radius))
         
-        for r_idx in range(min_gy, max_gy + 1): # Row in gradient (y)
-            for c_idx in range(min_gx, max_gx + 1): # Col in gradient (x)
-                # Center of the gradient cell in gradient's local coordinates
+        for r_idx in range(min_gy, max_gy + 1): 
+            for c_idx in range(min_gx, max_gx + 1): 
                 grad_cell_center_x = float(c_idx) + 0.5
                 grad_cell_center_y = float(r_idx) + 0.5
-
-                # Distance squared from player center to gradient cell center
                 dist_sq = (grad_cell_center_x - circle_center_in_grad_x)**2 + \
                           (grad_cell_center_y - circle_center_in_grad_y)**2
                 
-                if dist_sq < radius_sq: # If gradient cell center is within player's circle
+                if dist_sq < radius_sq: 
                     damage_value = damage_gradient[r_idx, c_idx]
                     if damage_value > max_damage_taken:
                         max_damage_taken = damage_value
         
+        # --- NEW: Ensure direct hit gets at least configured center damage ---
+        if directly_hit_player_from_impact is self:
+            if weapon_configured_center_damage > max_damage_taken:
+                print(f"Player {self.team.name} (Direct Hit): Overriding gradient damage {max_damage_taken} with configured center damage {weapon_configured_center_damage}")
+                max_damage_taken = weapon_configured_center_damage
+            elif max_damage_taken > 0 : # Only print if some damage was already calculated
+                 print(f"Player {self.team.name} (Direct Hit): Gradient damage {max_damage_taken} meets/exceeds configured center damage {weapon_configured_center_damage}.")
+
+
         if max_damage_taken > 0:
             self.apply_damage(int(max_damage_taken))

@@ -65,7 +65,7 @@
             "initial_inventory": {
                 "SMALL_BOMB": -1,
                 "BIG_BOMB": 2,
-                "SNIPER": 2,
+                "SNIPER": 10,
                 "SALVO": 2
             }
         },
