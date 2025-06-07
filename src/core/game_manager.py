@@ -329,14 +329,7 @@ class GameManager:
         if self.terrain: self.terrain.draw(screen)
         
         for player in self.players: 
-            # Player.draw should handle whether to draw if not alive, or add check here
-            player.draw(screen) # Let player.draw handle its alive state for drawing
+            if player.alive: # Good practice to check if alive before drawing
+                player.draw(screen) # Call Player.draw without the second argument
             
         if self.active_weapon: self.active_weapon.draw(screen)
-
-        # Draw active player indicator only if game is running and no weapon is active
-        if self.running and not self.active_weapon: 
-            active_player = self.get_active_player()
-            if active_player: 
-                indicator_pos = (int(active_player.x), int(active_player.y) - active_player.rect.height // 2 - 10)
-                pygame.draw.circle(screen, (255, 255, 0), indicator_pos, 5)

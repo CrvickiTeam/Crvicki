@@ -471,91 +471,105 @@ class Player:
         if not self.alive:
             return
 
-        
-        #pygame.draw.circle(screen, (255, 255, 255), (int(self.x), int(self.y)), int(self.radius), 1) # White circle, 1px thick
-
         is_active_player = (self.game_manager.get_active_player() == self)
 
         base_tank_sprite = self.active_tank_image_orig if is_active_player else self.waiting_tank_image_orig
-
         if base_tank_sprite:
-            tank_surface_to_render = pygame.transform.flip(base_tank_sprite, True,
-                                                           False) if self.direction == -1 else base_tank_sprite
+            tank_surface_to_render = pygame.transform.flip(base_tank_sprite, True, False) if self.direction == -1 else base_tank_sprite
             rotated_tank_surface = pygame.transform.rotate(tank_surface_to_render, self.angle)
-            # Use self.x, self.y (circle center) for the sprite's center
             tank_render_rect = rotated_tank_surface.get_rect(center=(int(self.x), int(self.y)))
             screen.blit(rotated_tank_surface, tank_render_rect.topleft)
         else:
-            # Fallback: draw the circular hitbox if no sprite
             hitbox_color = (255, 0, 0) if self.team == PlayerTeam.TEAM_1 else (0, 0, 255)
             pygame.draw.circle(screen, hitbox_color, (int(self.x), int(self.y)), int(self.radius), 1)
-            pygame.draw.circle(screen, (255, 255, 0), (int(self.x), int(self.y)), 3) # Center dot
 
-        if not is_active_player:
-            return
-
-        anchor_x, anchor_y = self.x, self.y # Pipe anchor is player center
-        if self.active_tank_image_orig: # Adjust if sprite has a specific visual anchor point
-            # This part of your draw code for pipe anchor might need review
-            # if the sprite's visual center for the pipe isn't the geometric center.
-            # For simplicity, I'm keeping it based on self.x, self.y for now.
-            # The original complex anchor calculation might still be relevant if your sprite isn't centered.
-            # Let's use the simplified version for now:
-            pass # anchor_x, anchor_y are already self.x, self.y
+        pipe_world_anchor_x, pipe_world_anchor_y = self.x, self.y
 
         if self.pipe_image_orig:
-            # ... (Your existing pipe drawing logic, ensure it uses anchor_x, anchor_y correctly) ...
-            pipe_pivot_x, pipe_pivot_y = 20, 22 # Assuming these are local to the pipe image
-            image_to_rotate = self.pipe_image_orig
-            pivot_x_on_image = pipe_pivot_x
+            player_local_pipe_mount_dx = 2.0 
+            player_local_pipe_mount_dy = 5.0 
+            pipe_pivot_local_x = 22 
+            pipe_pivot_local_y = 25 
 
-            if self.direction == -1: # This logic for flipping pipe might need review with new aim system
-                image_to_rotate = pygame.transform.flip(image_to_rotate, True, False)
-                pivot_x_on_image = image_to_rotate.get_width() - pipe_pivot_x
+            mount_offset_vec = pygame.math.Vector2(player_local_pipe_mount_dx * self.direction, 
+                                                   player_local_pipe_mount_dy)
+            rotated_mount_offset = mount_offset_vec.rotate(self.angle) 
+            pipe_world_anchor_x = self.x + rotated_mount_offset.x
+            pipe_world_anchor_y = self.y + rotated_mount_offset.y
             
-            pygame_rotation_angle = self.aim_angle 
-            # Your original code had vector_rotation_angle = self.aim_angle.
-            # Pygame's rotate is counter-clockwise. If your aim_angle is already in that system, it's fine.
+            current_pipe_image_to_rotate: pygame.Surface
+            actual_pivot_x_on_pipe_image: float
+            
+            # Determine the aim angle to display for the pipe
+            display_pipe_world_aim_angle: float
+            if is_active_player:
+                display_pipe_world_aim_angle = self.aim_angle
+            else:
+                # For non-active players, show pipe aiming straight horizontally
+                if self.direction == 1: # Facing right
+                    display_pipe_world_aim_angle = 0.0
+                else: # Facing left (direction == -1)
+                    display_pipe_world_aim_angle = 180.0
 
-            image_rect = image_to_rotate.get_rect()
-            pivot_vec = pygame.math.Vector2(pivot_x_on_image - image_rect.centerx,
-                                            pipe_pivot_y - image_rect.centery)
-            rotated_image = pygame.transform.rotate(image_to_rotate, pygame_rotation_angle)
-            rotated_rect = rotated_image.get_rect()
-            # For rotation around a pivot, see pygame.transform.rotozoom or manual offset calculation.
-            # The pivot logic from your draw code:
-            rotated_pivot_vec = pivot_vec.rotate(-pygame_rotation_angle) # Pygame rotation is CCW, vector rotation is CW for this formula
-            rotated_rect.center = (anchor_x - rotated_pivot_vec.x, anchor_y - rotated_pivot_vec.y)
-            screen.blit(rotated_image, rotated_rect.topleft)
+            # Calculate pygame_rotation_angle based on display_pipe_world_aim_angle
+            # This is the angle to rotate the *unflipped* pipe image by.
+            # If the pipe is flipped, its base orientation is 180 degrees.
+            pygame_rotation_angle: float
+            if self.direction == -1: # Player Facing Left
+                current_pipe_image_to_rotate = pygame.transform.flip(self.pipe_image_orig, True, False)
+                actual_pivot_x_on_pipe_image = current_pipe_image_to_rotate.get_width() - pipe_pivot_local_x
+                # The flipped image is already pointing left (180 deg).
+                # To get it to display_pipe_world_aim_angle (which will be 180 for non-active left),
+                # rotation needed is display_pipe_world_aim_angle - 180.
+                pygame_rotation_angle = display_pipe_world_aim_angle - 180.0
+            else: # Player Facing Right
+                current_pipe_image_to_rotate = self.pipe_image_orig
+                actual_pivot_x_on_pipe_image = float(pipe_pivot_local_x)
+                # The original image is pointing right (0 deg).
+                # Rotation needed is display_pipe_world_aim_angle - 0.
+                pygame_rotation_angle = display_pipe_world_aim_angle
 
+            pipe_image_rect = current_pipe_image_to_rotate.get_rect()
+            pivot_offset_in_pipe_image = pygame.math.Vector2(actual_pivot_x_on_pipe_image - pipe_image_rect.centerx,
+                                                             pipe_pivot_local_y - pipe_image_rect.centery)
+            rotated_pipe_image = pygame.transform.rotate(current_pipe_image_to_rotate, pygame_rotation_angle)
+            rotated_pivot_offset_in_pipe_image = pivot_offset_in_pipe_image.rotate(-pygame_rotation_angle)
+            rotated_pipe_rect = rotated_pipe_image.get_rect()
+            rotated_pipe_rect.center = (pipe_world_anchor_x - rotated_pivot_offset_in_pipe_image.x, 
+                                        pipe_world_anchor_y - rotated_pivot_offset_in_pipe_image.y)
+            
+            screen.blit(rotated_pipe_image, rotated_pipe_rect.topleft)
 
-        start_x_indicator, start_y_indicator = anchor_x, anchor_y
-        if self.pipe_image_orig: # Try to get pipe tip
-            # This needs to be accurate to the visual tip of the drawn pipe
-            # For simplicity, let's approximate from anchor and aim_angle
-            # This part of your draw code for indicator start might need review
-            dist_pivot_to_tip = self.pipe_image_orig.get_width() * 0.7 # Approximate
-            aim_rad = math.radians(self.aim_angle)
-            tip_offset_x = dist_pivot_to_tip * math.cos(aim_rad)
-            tip_offset_y = -dist_pivot_to_tip * math.sin(aim_rad) # Pygame y-axis is inverted
-            start_x_indicator += tip_offset_x
-            start_y_indicator += tip_offset_y
-        
-        aim_rad_indicator = math.radians(self.aim_angle)
-        line_length = (self.aim_power / self.max_aim_power) * 50
-        end_x_indicator = start_x_indicator + line_length * math.cos(aim_rad_indicator)
-        end_y_indicator = start_y_indicator - line_length * math.sin(aim_rad_indicator) # Pygame y-axis
-
-        pygame.draw.line(screen, (255, 255, 255), (int(start_x_indicator), int(start_y_indicator)), (int(end_x_indicator), int(end_y_indicator)), 2)
-
-        bar_width_health = 40 # Renamed to avoid conflict
+        max_health_val = self.config.get("game", {}).get("player", {}).get("max_health", 100)
+        bar_width_health = 40 
         bar_height_health = 6
-        fill_health = (self.health / 100) * bar_width_health
+        current_health_percentage = self.health / max_health_val if max_health_val > 0 else 0
+        fill_health = current_health_percentage * bar_width_health
         bar_x_health = self.x - bar_width_health // 2
-        bar_y_health = self.y - self.radius - 10 # Position above the circle
+        bar_y_health = self.y - self.radius - 15
+        pygame.draw.rect(screen, (50, 50, 50), (bar_x_health, bar_y_health, bar_width_health, bar_height_health))
         pygame.draw.rect(screen, (255, 0, 0), (bar_x_health, bar_y_health, fill_health, bar_height_health))
         pygame.draw.rect(screen, (255, 255, 255), (bar_x_health, bar_y_health, bar_width_health, bar_height_health), 1)
-        
+
+        if is_active_player: # Aiming line only for active player, using actual self.aim_angle
+            start_x_indicator, start_y_indicator = pipe_world_anchor_x, pipe_world_anchor_y 
+            if self.pipe_image_orig:
+                pipe_length_from_pivot = self.pipe_image_orig.get_width() - pipe_pivot_local_x 
+                aim_rad_world = math.radians(self.aim_angle) # Use actual aim_angle for line
+                tip_offset_x = pipe_length_from_pivot * math.cos(aim_rad_world)
+                tip_offset_y = -pipe_length_from_pivot * math.sin(aim_rad_world)
+                start_x_indicator = pipe_world_anchor_x + tip_offset_x 
+                start_y_indicator = pipe_world_anchor_y + tip_offset_y
+            
+            line_length = 30 + (self.aim_power / self.max_aim_power) * 70
+            # Aiming line uses the true self.aim_angle
+            end_x_indicator = start_x_indicator + line_length * math.cos(math.radians(self.aim_angle))
+            end_y_indicator = start_y_indicator - line_length * math.sin(math.radians(self.aim_angle))
+            pygame.draw.line(screen, (255, 255, 255, 180), 
+                             (int(start_x_indicator), int(start_y_indicator)), 
+                             (int(end_x_indicator), int(end_y_indicator)), 2)
+        # Power bar and any Player.draw specific yellow circle are confirmed removed
+
     def apply_damage(self, damage: int) -> None:
         if not self.alive:
             return
