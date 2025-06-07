@@ -98,70 +98,118 @@ class Projectile:
         self.explosion_radius = explosion_radius
         self.gradient_center_strength = center_damage
 
+        # Load sub-stepping parameters from config defaults
+        weapon_defaults_cfg = self.game_manager.config.get("game", {}).get("weapons", {}).get("defaults", {})
+        self.sub_step_radius_factor: float = float(weapon_defaults_cfg.get("sub_step_radius_factor", 0.5))
+        self.min_sub_step_size: float = float(weapon_defaults_cfg.get("min_sub_step_size", 1.0))
+        self.max_sub_steps_per_frame: int = int(weapon_defaults_cfg.get("max_sub_steps_per_frame", 100))
+
+
     def update(self, dt: float, terrain: 'Terrain'): 
         if self._finished:
             return
 
-        self.vy += self.gravity * dt
-        self.x += self.vx * dt
-        self.y += self.vy * dt
-
-        # Current projectile center
-        proj_cx: float = self.x
-        proj_cy: float = self.y
+        # --- Sub-Stepping for Collision Detection ---
+        total_dx = self.vx * dt
+        total_dy = self.vy * dt 
         
+        self.vy += self.gravity * dt 
+
+        distance_to_move = math.sqrt(total_dx**2 + total_dy**2)
+        
+        # Use configured step size parameters
+        step_size = max(self.min_sub_step_size, float(self.draw_size_radius) * self.sub_step_radius_factor) 
+
+        num_sub_steps = 0
+        if distance_to_move > 0: 
+            num_sub_steps = int(math.ceil(distance_to_move / step_size))
+            num_sub_steps = min(num_sub_steps, self.max_sub_steps_per_frame) # Apply cap
+        
+        if num_sub_steps == 0: 
+            self.x += total_dx
+            self.y += total_dy
+            num_sub_steps = 1 
+            sub_dx = 0 
+            sub_dy = 0
+        else:
+            sub_dx = total_dx / num_sub_steps
+            sub_dy = total_dy / num_sub_steps
+
         collided_this_frame = False
-        impact_position: Tuple[int, int] = (int(proj_cx), int(proj_cy)) # Default impact to projectile center
-        
-        # Check collision with players
-        for player in self.game_manager.players:
-            if player is not self.owner and player.alive:
-                # Player's circle properties
-                player_cx: float = player.x
-                player_cy: float = player.y
-                player_radius: float = player.radius
+        impact_position: Tuple[int, int] = (int(self.x + total_dx), int(self.y + total_dy)) # Default impact to final potential position
 
-                # Projectile's collision radius
-                projectile_collision_radius: float = float(self.draw_size_radius)
+        current_sub_step_x = self.x
+        current_sub_step_y = self.y
 
-                # Calculate distance squared between centers
-                dx: float = proj_cx - player_cx
-                dy: float = proj_cy - player_cy
-                distance_squared: float = dx*dx + dy*dy
+        for i in range(num_sub_steps):
+            if i > 0 or (num_sub_steps == 1 and (total_dx !=0 or total_dy !=0) ): # For the first step of multi-step, or the single step if it involves movement
+                current_sub_step_x += sub_dx
+                current_sub_step_y += sub_dy
+            
+            proj_cx_check: float = current_sub_step_x
+            proj_cy_check: float = current_sub_step_y
 
-                # Sum of radii
-                sum_radii: float = projectile_collision_radius + player_radius
-                sum_radii_squared: float = sum_radii * sum_radii
+            # Check collision with players at current sub-step position
+            for player in self.game_manager.players:
+                if player is not self.owner and player.alive:
+                    player_cx: float = player.x
+                    player_cy: float = player.y
+                    player_radius: float = player.radius
+                    projectile_collision_radius: float = float(self.draw_size_radius)
+                    dx_p: float = proj_cx_check - player_cx
+                    dy_p: float = proj_cy_check - player_cy
+                    distance_squared_p: float = dx_p*dx_p + dy_p*dy_p
+                    sum_radii_p: float = projectile_collision_radius + player_radius
+                    sum_radii_squared_p: float = sum_radii_p * sum_radii_p
 
-                if distance_squared < sum_radii_squared:
-                    collided_this_frame = True
-                    # Impact position can remain projectile center, or you could calculate a more precise point on player's circle
-                    impact_position = (int(proj_cx), int(proj_cy)) 
-                    print(f"Projectile hit player {player.team.name}")
-                    break # Projectile hit a player, no need to check others or terrain for this frame
+                    if distance_squared_p < sum_radii_squared_p:
+                        collided_this_frame = True
+                        impact_position = (int(proj_cx_check), int(proj_cy_check)) 
+                        self.x = proj_cx_check # Set final position to impact point
+                        self.y = proj_cy_check
+                        print(f"Projectile hit player {player.team.name} during sub-step.")
+                        break 
+            if collided_this_frame:
+                break # Exit sub-step loop if player hit
 
-        # If not hit a player, check terrain collision
-        if not collided_this_frame:
-            check_x, check_y = int(proj_cx), int(proj_cy) # Use integer grid coordinates for terrain check
+            # If not hit a player, check terrain collision at current sub-step position
+            check_x, check_y = int(proj_cx_check), int(proj_cy_check)
+            
             # Check world boundaries
-            if not (0 <= check_x < terrain.width and 0 <= check_y < terrain.height): # Allow y to be < 0 (flying above terrain)
-                if check_y >= terrain.height or check_x < 0 or check_x >= terrain.width: # Hit bottom or side boundaries
-                    collided_this_frame = True
-                    impact_position = (check_x, check_y)
-                    print(f"Projectile hit world boundary at ({check_x}, {check_y})")
-            # Check terrain material if within bounds
-            elif 0 <= check_y < terrain.height: # Ensure y is not negative before indexing logic_grid
-                # Ensure check_x is also within valid range for logic_grid
-                safe_check_x = min(max(0, check_x), terrain.width - 1)
-                safe_check_y = min(max(0, check_y), terrain.height - 1)
-                if terrain.logic_grid[safe_check_x, safe_check_y] != TerrainMaterial.EMPTY.value: 
-                    collided_this_frame = True
-                    impact_position = (check_x, check_y)
-                    print(f"Projectile hit terrain at ({check_x}, {check_y})")
+            hit_boundary = False
+            if not (0 <= check_x < terrain.width and 0 <= check_y < terrain.height):
+                if check_y >= terrain.height or check_x < 0 or check_x >= terrain.width or check_y < 0: # Added check_y < 0 for hitting top boundary
+                    hit_boundary = True
+            
+            if hit_boundary:
+                collided_this_frame = True
+                impact_position = (check_x, check_y)
+                self.x = proj_cx_check # Set final position to impact point
+                self.y = proj_cy_check
+                print(f"Projectile hit world boundary at ({check_x}, {check_y}) during sub-step.")
+                break # Exit sub-step loop
+
+            # Check terrain material if within bounds (and not already hit boundary)
+            # Ensure y is not negative before indexing logic_grid (already covered by boundary check)
+            safe_check_x = min(max(0, check_x), terrain.width - 1)
+            safe_check_y = min(max(0, check_y), terrain.height - 1) # y should be >= 0 here
+            if terrain.logic_grid[safe_check_x, safe_check_y] != TerrainMaterial.EMPTY.value: 
+                collided_this_frame = True
+                impact_position = (check_x, check_y)
+                self.x = proj_cx_check # Set final position to impact point
+                self.y = proj_cy_check
+                print(f"Projectile hit terrain at ({check_x}, {check_y}) during sub-step.")
+                break # Exit sub-step loop
+            
+            # If this was the last sub_step and no collision, update projectile's main position
+            if i == num_sub_steps - 1 and not collided_this_frame:
+                self.x = current_sub_step_x
+                self.y = current_sub_step_y
         
+        # --- End of Sub-Stepping ---
+
         if collided_this_frame:
             self._finished = True
-            # Ensure impact_position is clamped to world bounds for gradient creation
             clamped_impact_x = min(max(0, impact_position[0]), terrain.width -1)
             clamped_impact_y = min(max(0, impact_position[1]), terrain.height -1)
 

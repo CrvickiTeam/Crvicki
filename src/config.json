@@ -73,6 +73,9 @@
             "defaults": {
                 "power_to_velocity_scale": 5.0,
                 "projectile_gravity": 400.0,
+                "sub_step_radius_factor": 0.5,
+                "min_sub_step_size": 1.0,
+                "max_sub_steps_per_frame": 100,
                 "projectile_draw_size_radius": 5
             },
             "small_bomb": {
