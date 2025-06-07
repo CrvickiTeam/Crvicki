@@ -3,11 +3,14 @@ import pygame
 import math 
 import numpy as np
 from typing import List, TYPE_CHECKING, Dict, Any, Optional, Tuple
-from enum import Enum # <<< ADD Enum
+from enum import Enum
+
+# Add this import
+from ..terrain import TerrainMaterial # <<< ADD THIS LINE
 
 if TYPE_CHECKING:
     from ..player import Player
-    from ..terrain import Terrain
+    from ..terrain import Terrain # This is for type hinting, TerrainMaterial needs direct import
     from ..game_manager import GameManager
 
 class WeaponType(Enum): # <<< NEW ENUM
@@ -91,7 +94,7 @@ class Projectile:
         self._impact_data: Optional[Dict[str, Any]] = None
 
         self.gravity: float = gravity
-        self.draw_size_radius: int = draw_size_radius
+        self.draw_size_radius: int = draw_size_radius # This will be used as collision radius
         self.explosion_radius = explosion_radius
         self.gradient_center_strength = center_damage
 
@@ -103,30 +106,68 @@ class Projectile:
         self.x += self.vx * dt
         self.y += self.vy * dt
 
-        proj_point = (int(self.x), int(self.y))
+        # Current projectile center
+        proj_cx: float = self.x
+        proj_cy: float = self.y
         
         collided_this_frame = False
-        impact_position: Tuple[int, int] = proj_point
+        impact_position: Tuple[int, int] = (int(proj_cx), int(proj_cy)) # Default impact to projectile center
         
+        # Check collision with players
         for player in self.game_manager.players:
             if player is not self.owner and player.alive:
-                if player.rect.collidepoint(proj_point):
-                    collided_this_frame = True
-                    break 
+                # Player's circle properties
+                player_cx: float = player.x
+                player_cy: float = player.y
+                player_radius: float = player.radius
 
-        if not collided_this_frame:
-            check_x, check_y = proj_point
-            if not (0 <= check_x < terrain.width and check_y < terrain.height):
-                collided_this_frame = True
-            elif check_y >= 0:
-                if terrain.logic_grid[min(check_x, terrain.width-1), min(check_y, terrain.height-1)] != 0: 
+                # Projectile's collision radius
+                projectile_collision_radius: float = float(self.draw_size_radius)
+
+                # Calculate distance squared between centers
+                dx: float = proj_cx - player_cx
+                dy: float = proj_cy - player_cy
+                distance_squared: float = dx*dx + dy*dy
+
+                # Sum of radii
+                sum_radii: float = projectile_collision_radius + player_radius
+                sum_radii_squared: float = sum_radii * sum_radii
+
+                if distance_squared < sum_radii_squared:
                     collided_this_frame = True
+                    # Impact position can remain projectile center, or you could calculate a more precise point on player's circle
+                    impact_position = (int(proj_cx), int(proj_cy)) 
+                    print(f"Projectile hit player {player.team.name}")
+                    break # Projectile hit a player, no need to check others or terrain for this frame
+
+        # If not hit a player, check terrain collision
+        if not collided_this_frame:
+            check_x, check_y = int(proj_cx), int(proj_cy) # Use integer grid coordinates for terrain check
+            # Check world boundaries
+            if not (0 <= check_x < terrain.width and 0 <= check_y < terrain.height): # Allow y to be < 0 (flying above terrain)
+                if check_y >= terrain.height or check_x < 0 or check_x >= terrain.width: # Hit bottom or side boundaries
+                    collided_this_frame = True
+                    impact_position = (check_x, check_y)
+                    print(f"Projectile hit world boundary at ({check_x}, {check_y})")
+            # Check terrain material if within bounds
+            elif 0 <= check_y < terrain.height: # Ensure y is not negative before indexing logic_grid
+                # Ensure check_x is also within valid range for logic_grid
+                safe_check_x = min(max(0, check_x), terrain.width - 1)
+                safe_check_y = min(max(0, check_y), terrain.height - 1)
+                if terrain.logic_grid[safe_check_x, safe_check_y] != TerrainMaterial.EMPTY.value: 
+                    collided_this_frame = True
+                    impact_position = (check_x, check_y)
+                    print(f"Projectile hit terrain at ({check_x}, {check_y})")
         
         if collided_this_frame:
             self._finished = True
+            # Ensure impact_position is clamped to world bounds for gradient creation
+            clamped_impact_x = min(max(0, impact_position[0]), terrain.width -1)
+            clamped_impact_y = min(max(0, impact_position[1]), terrain.height -1)
+
             gradient_start_x, gradient_start_y, effect_gradient_array = create_explosion_gradient(
-                impact_position[0], 
-                impact_position[1],
+                clamped_impact_x, 
+                clamped_impact_y,
                 self.explosion_radius,
                 self.gradient_center_strength
             )
@@ -134,7 +175,7 @@ class Projectile:
                 'gradient_origin': (gradient_start_x, gradient_start_y),
                 'effect_gradient': effect_gradient_array,
                 'owner': self.owner,
-                'explosion_center': impact_position,
+                'explosion_center': (clamped_impact_x, clamped_impact_y),
                 'explosion_radius': self.explosion_radius
             }
 
