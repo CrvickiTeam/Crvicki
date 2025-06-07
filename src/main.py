@@ -10,17 +10,17 @@ from core.game_manager import GameManager
 from typing import Dict, Any
 
 
-def load_config(file_path: str) -> Dict[str, Any]:
+def load_config() -> Dict[str, Any]:
     """Load the game configuration from a JSON file."""
     try:
-        with open(file_path, 'r') as file:
+        with open(os.path.join(os.path.dirname(__file__), "config.json"), 'r') as file:
             config = json.load(file)
         return config
     except FileNotFoundError:
-        print(f"Error: Configuration file '{file_path}' not found.")
+        print(f"Error: Configuration file 'config.json' not found.")
         return {}
     except json.JSONDecodeError:
-        print(f"Error: Configuration file '{file_path}' is not a valid JSON.")
+        print(f"Error: Configuration file 'config.json' is not a valid JSON.")
         return {}
     except Exception as e:
         print(f"Error loading configuration: {e}")
@@ -28,7 +28,7 @@ def load_config(file_path: str) -> Dict[str, Any]:
 
 
 def main() -> None:
-    config = load_config("src/config.json")
+    config = load_config()
     display_config: dict = config.get("display", {})
     screen_width: int = display_config.get("width", 1280)
     screen_height: int = display_config.get("height", 720)
