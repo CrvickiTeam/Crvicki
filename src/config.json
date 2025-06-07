@@ -65,13 +65,13 @@
             "initial_inventory": {
                 "SMALL_BOMB": -1,
                 "BIG_BOMB": 2,
-                "SNIPER": 10,
+                "SNIPER": 2,
                 "SALVO": 2
             }
         },
         "weapons": {
             "defaults": {
-                "power_to_velocity_scale": 5.0,
+                "power_to_velocity_scale": 5.5,
                 "projectile_gravity": 400.0,
                 "sub_step_radius_factor": 0.5,
                 "min_sub_step_size": 1.0,

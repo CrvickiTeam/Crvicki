@@ -39,7 +39,7 @@ class SmallBomb(Weapon):
             return
 
         angle_rad = math.radians(angle)
-        velocity_magnitude = power * self.default_power_to_velocity_scale 
+        velocity_magnitude = power * self.power_to_velocity_scale
         initial_vx = velocity_magnitude * math.cos(angle_rad)
         initial_vy = -velocity_magnitude * math.sin(angle_rad)
 
