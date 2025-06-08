@@ -322,6 +322,7 @@ class GameManager:
             return 
 
         if weapon_instance:
+            active_player.stop_moving()
             weapon_instance.activate(angle, power)
             self.active_weapon = weapon_instance
     
