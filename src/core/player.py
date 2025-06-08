@@ -500,33 +500,23 @@ class Player:
             current_pipe_image_to_rotate: pygame.Surface
             actual_pivot_x_on_pipe_image: float
             
-            # Determine the aim angle to display for the pipe
             display_pipe_world_aim_angle: float
             if is_active_player:
                 display_pipe_world_aim_angle = self.aim_angle
             else:
-                # For non-active players, show pipe aiming straight horizontally
-                if self.direction == 1: # Facing right
+                if self.direction == 1: 
                     display_pipe_world_aim_angle = 0.0
-                else: # Facing left (direction == -1)
+                else: 
                     display_pipe_world_aim_angle = 180.0
 
-            # Calculate pygame_rotation_angle based on display_pipe_world_aim_angle
-            # This is the angle to rotate the *unflipped* pipe image by.
-            # If the pipe is flipped, its base orientation is 180 degrees.
             pygame_rotation_angle: float
-            if self.direction == -1: # Player Facing Left
+            if self.direction == -1: 
                 current_pipe_image_to_rotate = pygame.transform.flip(self.pipe_image_orig, True, False)
                 actual_pivot_x_on_pipe_image = current_pipe_image_to_rotate.get_width() - pipe_pivot_local_x
-                # The flipped image is already pointing left (180 deg).
-                # To get it to display_pipe_world_aim_angle (which will be 180 for non-active left),
-                # rotation needed is display_pipe_world_aim_angle - 180.
                 pygame_rotation_angle = display_pipe_world_aim_angle - 180.0
-            else: # Player Facing Right
+            else: 
                 current_pipe_image_to_rotate = self.pipe_image_orig
                 actual_pivot_x_on_pipe_image = float(pipe_pivot_local_x)
-                # The original image is pointing right (0 deg).
-                # Rotation needed is display_pipe_world_aim_angle - 0.
                 pygame_rotation_angle = display_pipe_world_aim_angle
 
             pipe_image_rect = current_pipe_image_to_rotate.get_rect()
@@ -540,35 +530,55 @@ class Player:
             
             screen.blit(rotated_pipe_image, rotated_pipe_rect.topleft)
 
+        # --- Health Bar ---
         max_health_val = self.config.get("game", {}).get("player", {}).get("max_health", 100)
         bar_width_health = 40 
         bar_height_health = 6
         current_health_percentage = self.health / max_health_val if max_health_val > 0 else 0
         fill_health = current_health_percentage * bar_width_health
         bar_x_health = self.x - bar_width_health // 2
-        bar_y_health = self.y - self.radius - 15
-        pygame.draw.rect(screen, (50, 50, 50), (bar_x_health, bar_y_health, bar_width_health, bar_height_health))
-        pygame.draw.rect(screen, (255, 0, 0), (bar_x_health, bar_y_health, fill_health, bar_height_health))
-        pygame.draw.rect(screen, (255, 255, 255), (bar_x_health, bar_y_health, bar_width_health, bar_height_health), 1)
+        bar_y_health = self.y - self.radius - 15 # Health bar above player
+        
+        bar_background_color = (220, 220, 220) # Lighter background color
 
-        if is_active_player: # Aiming line only for active player, using actual self.aim_angle
+        pygame.draw.rect(screen, bar_background_color, (bar_x_health, bar_y_health, bar_width_health, bar_height_health)) # Background
+        pygame.draw.rect(screen, (255, 0, 0), (bar_x_health, bar_y_health, fill_health, bar_height_health)) # Health fill
+        pygame.draw.rect(screen, (255, 255, 255), (bar_x_health, bar_y_health, bar_width_health, bar_height_health), 1) # Border
+
+        if is_active_player: 
+            # --- Aiming Line ---
             start_x_indicator, start_y_indicator = pipe_world_anchor_x, pipe_world_anchor_y 
             if self.pipe_image_orig:
                 pipe_length_from_pivot = self.pipe_image_orig.get_width() - pipe_pivot_local_x 
-                aim_rad_world = math.radians(self.aim_angle) # Use actual aim_angle for line
+                aim_rad_world = math.radians(self.aim_angle) 
                 tip_offset_x = pipe_length_from_pivot * math.cos(aim_rad_world)
                 tip_offset_y = -pipe_length_from_pivot * math.sin(aim_rad_world)
                 start_x_indicator = pipe_world_anchor_x + tip_offset_x 
                 start_y_indicator = pipe_world_anchor_y + tip_offset_y
             
             line_length = 30 + (self.aim_power / self.max_aim_power) * 70
-            # Aiming line uses the true self.aim_angle
             end_x_indicator = start_x_indicator + line_length * math.cos(math.radians(self.aim_angle))
             end_y_indicator = start_y_indicator - line_length * math.sin(math.radians(self.aim_angle))
             pygame.draw.line(screen, (255, 255, 255, 180), 
                              (int(start_x_indicator), int(start_y_indicator)), 
                              (int(end_x_indicator), int(end_y_indicator)), 2)
-        # Power bar and any Player.draw specific yellow circle are confirmed removed
+            
+            # --- Fuel Bar (Movement Bar) ---
+            bar_width_fuel = 40
+            bar_height_fuel = 6
+            remaining_fuel_percentage = 0.0
+            if self.max_move_distance_per_turn > 0: 
+                remaining_fuel_percentage = (self.max_move_distance_per_turn - self.distance_moved_this_turn) / self.max_move_distance_per_turn
+            remaining_fuel_percentage = max(0.0, min(1.0, remaining_fuel_percentage)) 
+            
+            fill_fuel = remaining_fuel_percentage * bar_width_fuel
+            
+            bar_x_fuel = self.x - bar_width_fuel // 2
+            bar_y_fuel = bar_y_health - bar_height_fuel - 2 
+
+            pygame.draw.rect(screen, bar_background_color, (bar_x_fuel, bar_y_fuel, bar_width_fuel, bar_height_fuel)) # Background
+            pygame.draw.rect(screen, (0, 0, 255), (bar_x_fuel, bar_y_fuel, fill_fuel, bar_height_fuel)) # Blue fill for fuel
+            pygame.draw.rect(screen, (255, 255, 255), (bar_x_fuel, bar_y_fuel, bar_width_fuel, bar_height_fuel), 1) # Border
 
     def apply_damage(self, damage: int) -> None:
         if not self.alive:
