@@ -26,7 +26,7 @@ class MainMenuScene(Scene):
         self.player_count = self.config.get('game_settings', {}).get('player_count', 2)
         self.game_mode = self.config.get('game_settings', {}).get('game_mode', "FFA")
         # Initialize map_type from config or default to FLAT
-        default_map_value = self.config.get('game_settings', {}).get('map_type', TerrainMap.FLAT.value)
+        default_map_value = self.config.get('game_settings', {}).get('map_type', TerrainMap.HILL.value)
         try:
             self.map_type = TerrainMap(default_map_value)
         except ValueError:
