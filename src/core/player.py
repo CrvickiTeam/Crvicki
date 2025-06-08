@@ -78,6 +78,13 @@ class Player:
         # self.rect is the bounding box of the circle
         self.rect: pygame.Rect = pygame.Rect(self.x - self.radius, self.y - self.radius, self.width, self.height)
 
+        # Damage indicators
+        self.damage_indicators: List[Dict[str, Any]] = []
+        self.damage_font = pygame.font.Font(None, 28) # Font for damage numbers
+        self.damage_text_color = (255, 50, 50) # Red color for damage
+        self.damage_indicator_lifetime_ms = 1200 # How long the damage number stays (in ms)
+        self.damage_indicator_float_speed_y = -30 # Pixels per second upwards
+
 
     def _initialize_inventory(self) -> None:
         """Sets up the initial weapon counts for the player from config."""
@@ -466,6 +473,25 @@ class Player:
         self.rect.width = int(self.radius * 2)
         self.rect.height = int(self.radius * 2)
 
+        # --- Update Damage Indicators ---
+        current_time_ms = pygame.time.get_ticks()
+        for i in range(len(self.damage_indicators) - 1, -1, -1): # Iterate backwards for safe removal
+            indicator = self.damage_indicators[i]
+            
+            # Update position (float upwards)
+            indicator["position"][1] += indicator["float_speed_y"] * dt
+            
+            # Update alpha (fade out)
+            age_ms = current_time_ms - indicator["creation_time_ms"]
+            if age_ms >= indicator["lifetime_ms"]:
+                self.damage_indicators.pop(i)
+                continue
+            
+            # Quadratic fade for smoother end (alpha = 255 * (remaining_life_ratio)^2)
+            remaining_life_ratio = 1.0 - (age_ms / indicator["lifetime_ms"])
+            indicator["alpha"] = int(255 * remaining_life_ratio * remaining_life_ratio) 
+            indicator["alpha"] = max(0, min(255, indicator["alpha"])) # Clamp alpha
+
 
     def draw(self, screen: pygame.Surface) -> None:
         if not self.alive:
@@ -580,14 +606,53 @@ class Player:
             pygame.draw.rect(screen, (0, 0, 255), (bar_x_fuel, bar_y_fuel, fill_fuel, bar_height_fuel)) # Blue fill for fuel
             pygame.draw.rect(screen, (255, 255, 255), (bar_x_fuel, bar_y_fuel, bar_width_fuel, bar_height_fuel), 1) # Border
 
+        # --- Draw Damage Indicators ---
+        for indicator in self.damage_indicators:
+            # Create a temporary surface for rendering with alpha
+            # This is safer than modifying the original surface's alpha directly if it's reused
+            temp_surface = indicator["surface"].copy() 
+            temp_surface.set_alpha(indicator["alpha"])
+            
+            # Center the text surface at its current position
+            text_rect = temp_surface.get_rect(center=(int(indicator["position"][0]), int(indicator["position"][1])))
+            screen.blit(temp_surface, text_rect)
+
     def apply_damage(self, damage: int) -> None:
-        if not self.alive:
+        if not self.alive or damage <= 0: # Only apply if damage is positive
             return
-        self.health -= damage
+        
+        actual_damage = int(damage) # Ensure it's an integer
+        self.health -= actual_damage
+        
+        # --- Create Damage Indicator ---
+        text = f"-{actual_damage}"
+        text_surface = self.damage_font.render(text, True, self.damage_text_color)
+        
+        # Initial position slightly above the player's center
+        # Randomize x slightly for multiple hits not overlapping perfectly
+        start_x = self.x + np.random.uniform(-self.radius * 0.3, self.radius * 0.3) # Reduced random range
+        start_y = self.y - self.radius - 15 # Position above health bar
+        
+        indicator_info = {
+            "surface": text_surface,
+            "position": [start_x, start_y], # List for mutable position
+            "alpha": 255,
+            "lifetime_ms": self.damage_indicator_lifetime_ms,
+            "creation_time_ms": pygame.time.get_ticks(),
+            "float_speed_y": self.damage_indicator_float_speed_y 
+        }
+        self.damage_indicators.append(indicator_info)
+        # --- End Damage Indicator Creation ---
+        
+        # Original console print (can be kept or removed)
+        # print(f"Player {self.team.name} took {actual_damage} damage. Health: {self.health}/{self.config.get('game', {}).get('player', {}).get('max_health', 100)}")
+
         if self.health <= 0:
             self.health = 0
             self.alive = False
-            self.game_manager.is_game_over() 
+            # print(f"Player {self.team.name} has been defeated.") # Original print
+            if self.game_manager: # Check if game_manager is set
+                self.game_manager.is_game_over() 
 
     def process_explosion_damage(self, 
                                  gradient_origin: Tuple[int, int], 
