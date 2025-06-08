@@ -1,0 +1,132 @@
+{
+    "display": {
+        "width": 1280,
+        "height": 720,
+        "caption": "Crvicki Game",
+        "fps_limit": 60
+    },
+    "game": {
+        "background": {
+            "sky_color": [100, 160, 255],
+            "enable_clouds": true
+        },
+        "terrain": {
+            "materials": [
+                {
+                    "_type": "EMPTY",
+                    "color": [0, 0, 0, 0],
+                    "hardness": 0
+                },
+                {
+                    "_type": "GRASS",
+                    "color": [0, 255, 0, 255],
+                    "hardness": 5
+                },
+                {
+                    "_type": "SOIL",
+                    "color": [139, 69, 19, 255],
+                    "hardness": 5
+                },
+                {
+                    "_type": "STONE",
+                    "color": [128, 128, 128, 255],
+                    "hardness": 10
+                },
+                {
+                    "_type": "BEDROCK",
+                    "color": [50, 50, 50, 255],
+                    "hardness": 0
+                }
+            ],
+            "maps": {
+                "flat": {
+                    "grass_thickness": 10,
+                    "soil_thickness_ratio": 0.333,
+                    "bedrock_thickness": 10
+                },
+                "hill": {
+                    "grass_thickness": 10,
+                    "soil_thickness_ratio": 0.333,
+                    "bedrock_thickness": 10,
+                    "hill_width_ratio": 0.4,
+                    "hill_peak_elevation_ratio": 0.18,
+                    "stone_chunk_count": 16,
+                    "stone_main_radius_min": 8,
+                    "stone_main_radius_max": 18,
+                    "stone_blob_count_min": 5,
+                    "stone_blob_count_max": 10,
+                    "stone_blob_radius_min": 4,
+                    "stone_blob_radius_max": 10,
+                    "stone_blob_offset_factor": 0.7
+                }
+            }
+        },
+        "player": {
+            "movement": {
+                "drive_speed": 100.0,
+                "gravity": 400.0,
+                "step_height": 8,
+                "max_move_distance_per_turn": 200.0
+            },
+            "hitbox": {
+                "radius": 20
+            },
+            "aiming": {
+                "min_power": 10.0,
+                "max_power": 135.0,
+                "default_power": 50.0,
+                "angle_change_rate": 60.0,
+                "power_change_rate": 50.0,
+                "max_up_degrees": 90.0,
+                "min_down_degrees_offset": -10.0
+            },
+            "max_health": 100,
+            "initial_inventory": {
+                "SMALL_BOMB": -1,
+                "BIG_BOMB": 2,
+                "SNIPER": 2,
+                "SALVO": 2
+            }
+        },
+        "weapons": {
+            "defaults": {
+                "power_to_velocity_scale": 5.5,
+                "projectile_gravity": 400.0,
+                "sub_step_radius_factor": 0.5,
+                "min_sub_step_size": 1.0,
+                "max_sub_steps_per_frame": 100,
+                "projectile_draw_size_radius": 5
+            },
+            "small_bomb": {
+                "explosion_radius": 30,
+                "center_damage": 25
+            },
+            "big_bomb": {
+                "explosion_radius": 60,
+                "center_damage": 50,
+                "projectile_draw_size_radius": 7
+            },
+            "sniper": {
+                "explosion_radius": 3,
+                "center_damage": 85,
+                "projectile_draw_size_radius": 3
+            },
+            "salvo": {
+                "num_projectiles": 16,
+                "shot_delay": 0.07,
+                "angle_spread": 2.5,
+                "power_spread_percentage": 0.1,
+                "explosion_radius": 30,
+                "center_damage": 10,
+                "projectile_draw_size_radius": 4
+            }
+        },
+        "game_settings": {
+            "player_count": 2,
+            "game_mode": "FFA"
+        }
+    },
+    "logging": {
+        "level": "INFO"
+    }
+}
