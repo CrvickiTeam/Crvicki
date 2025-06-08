@@ -98,8 +98,9 @@ class MainMenuScene(Scene):
 
     def handle_input(self, event: pygame.event.Event) -> None:
         if event.type == pygame.QUIT:
-            pygame.quit()
+            # pygame.quit() # REMOVE THIS LINE
             # Consider sys.exit() or a manager-based quit
+            pass # The main loop in main.py will handle setting running to False
         if event.type == pygame.MOUSEBUTTONDOWN:
             if event.button == 1: # Left mouse button
                 if self.start_button_rect.collidepoint(event.pos):
