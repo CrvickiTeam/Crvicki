@@ -39,7 +39,26 @@
                 }
             ],
             "maps": {
-                "flat": 0
+                "flat": {
+                    "grass_thickness": 10,
+                    "soil_thickness_ratio": 0.333,
+                    "bedrock_thickness": 10
+                },
+                "hill": {
+                    "grass_thickness": 10,
+                    "soil_thickness_ratio": 0.333,
+                    "bedrock_thickness": 10,
+                    "hill_width_ratio": 0.4,
+                    "hill_peak_elevation_ratio": 0.18,
+                    "stone_chunk_count": 16,
+                    "stone_main_radius_min": 8,
+                    "stone_main_radius_max": 18,
+                    "stone_blob_count_min": 5,
+                    "stone_blob_count_max": 10,
+                    "stone_blob_radius_min": 4,
+                    "stone_blob_radius_max": 10,
+                    "stone_blob_offset_factor": 0.7
+                }
             }
         },
         "player": {
