@@ -39,7 +39,8 @@
                 }
             ],
             "maps": {
-                "flat": 0
+                "flat": 0,
+                "hill": 1
             }
         },
         "player": {

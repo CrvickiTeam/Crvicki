@@ -65,7 +65,17 @@ class SceneManager:
                 return # Don't switch if not in game
         elif new_scene_key == "GAME": # Intending to go to Game scene (e.g. from Main Menu or Win Menu)
             self.active_scene = self.scenes["GAME"] # Set active scene before starting game
-            self.game_controller.start_new_game(TerrainMap.FLAT)
+            
+            # Retrieve map_type from config, default to FLAT if not found or invalid
+            game_settings = self.config.get('game_settings', {})
+            map_type_value = game_settings.get('map_type', TerrainMap.FLAT.value)
+            try:
+                selected_map = TerrainMap(map_type_value)
+            except ValueError:
+                print(f"Warning: Invalid map_type_value {map_type_value} from config. Defaulting to FLAT.")
+                selected_map = TerrainMap.FLAT
+            
+            self.game_controller.start_new_game(selected_map)
             # Reset GameScene specific states, like the timer
             game_scene_instance = self.scenes.get("GAME")
             if isinstance(game_scene_instance, GameScene): # Type check for safety

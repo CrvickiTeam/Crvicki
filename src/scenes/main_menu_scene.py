@@ -1,6 +1,7 @@
 import pygame
 
 from .scene import Scene
+from core.terrain import TerrainMap # Import TerrainMap
 
 # Constants for colors
 BLACK = (0, 0, 0)
@@ -22,8 +23,16 @@ class MainMenuScene(Scene):
         super().__init__(manager, config)
 
         # Game settings variables
-        self.player_count = 2
-        self.game_mode = "FFA"
+        self.player_count = self.config.get('game_settings', {}).get('player_count', 2)
+        self.game_mode = self.config.get('game_settings', {}).get('game_mode', "FFA")
+        # Initialize map_type from config or default to FLAT
+        default_map_value = self.config.get('game_settings', {}).get('map_type', TerrainMap.FLAT.value)
+        try:
+            self.map_type = TerrainMap(default_map_value)
+        except ValueError:
+            self.map_type = TerrainMap.FLAT # Fallback if value is invalid
+            print(f"Warning: Invalid map_type value {default_map_value} in config. Defaulting to FLAT.")
+
 
         # Fonts
         self.title_font = pygame.font.Font(None, 80)
@@ -74,6 +83,19 @@ class MainMenuScene(Scene):
         self.game_mode_text_surface = self.button_font.render(f"Game mode: {self.game_mode}", True, BUTTON_TEXT_COLOR)
         self.game_mode_text_rect = self.game_mode_text_surface.get_rect(center=self.game_mode_button_rect.center)
 
+        # Map Type Button
+        map_type_button_y = game_mode_button_y + button_height + button_spacing
+        self.map_type_button_rect = pygame.Rect(
+            (self.screen_width // 2 - button_width // 2, map_type_button_y),
+            (button_width, button_height)
+        )
+        self.map_type_button_idle_color = INFO_BUTTON_IDLE_COLOR
+        self.map_type_button_hover_color = INFO_BUTTON_HOVER_COLOR
+        self.current_map_type_button_color = self.map_type_button_idle_color
+        self.map_type_text_surface = self.button_font.render(f"Map: {self.map_type.name.capitalize()}", True, BUTTON_TEXT_COLOR)
+        self.map_type_text_rect = self.map_type_text_surface.get_rect(center=self.map_type_button_rect.center)
+
+
     def handle_input(self, event: pygame.event.Event) -> None:
         if event.type == pygame.QUIT:
             pygame.quit()
@@ -83,11 +105,11 @@ class MainMenuScene(Scene):
                 if self.start_button_rect.collidepoint(event.pos):
                     print("Start Game button clicked!")
                     # Store the settings in the shared config dictionary
-                    # This config is accessible by other scenes, including GameScene.
                     if 'game_settings' not in self.config:
                         self.config['game_settings'] = {}
                     self.config['game_settings']['player_count'] = self.player_count
                     self.config['game_settings']['game_mode'] = self.game_mode
+                    self.config['game_settings']['map_type'] = self.map_type.value # Store map type value
                     
                     print(f"Settings stored in config: {self.config['game_settings']}")
                     
@@ -101,13 +123,11 @@ class MainMenuScene(Scene):
                         self.player_count = 2
                     print(f"Player count changed to: {self.player_count}")
 
-                    # If player count is not 4, force game mode to FFA
                     if self.player_count != 4 and self.game_mode == "TEAMS":
                         self.game_mode = "FFA"
                         print(f"Game mode automatically set to FFA due to player count.")
 
                 elif self.game_mode_button_rect.collidepoint(event.pos):
-                    # Only allow game mode change if player count is 4
                     if self.player_count == 4:
                         if self.game_mode == "FFA":
                             self.game_mode = "TEAMS"
@@ -116,6 +136,15 @@ class MainMenuScene(Scene):
                         print(f"Game mode changed to: {self.game_mode}")
                     else:
                         print("Game mode cannot be changed when player count is not 4.")
+                
+                elif self.map_type_button_rect.collidepoint(event.pos):
+                    if self.map_type == TerrainMap.FLAT:
+                        self.map_type = TerrainMap.HILL
+                    elif self.map_type == TerrainMap.HILL:
+                        self.map_type = TerrainMap.FLAT
+                    # Add more map types here if needed in the future
+                    print(f"Map type changed to: {self.map_type.name}")
+
 
     def update(self, dt: float) -> None:
         mouse_pos = pygame.mouse.get_pos()
@@ -141,11 +170,20 @@ class MainMenuScene(Scene):
             else:
                 self.current_game_mode_button_color = self.game_mode_button_idle_color
 
+        # Map Type Button hover
+        if self.map_type_button_rect.collidepoint(mouse_pos):
+            self.current_map_type_button_color = self.map_type_button_hover_color
+        else:
+            self.current_map_type_button_color = self.map_type_button_idle_color
+
+
         # Update text surfaces if values change
         self.player_count_text_surface = self.button_font.render(f"Player count: {self.player_count}", True, BUTTON_TEXT_COLOR)
         self.player_count_text_rect = self.player_count_text_surface.get_rect(center=self.player_count_button_rect.center)
         self.game_mode_text_surface = self.button_font.render(f"Game mode: {self.game_mode}", True, BUTTON_TEXT_COLOR)
         self.game_mode_text_rect = self.game_mode_text_surface.get_rect(center=self.game_mode_button_rect.center)
+        self.map_type_text_surface = self.button_font.render(f"Map: {self.map_type.name.capitalize()}", True, BUTTON_TEXT_COLOR)
+        self.map_type_text_rect = self.map_type_text_surface.get_rect(center=self.map_type_button_rect.center)
 
 
     def draw(self, screen: pygame.Surface) -> None:
@@ -165,3 +203,7 @@ class MainMenuScene(Scene):
         # Draw Game Mode Button
         pygame.draw.rect(screen, self.current_game_mode_button_color, self.game_mode_button_rect, border_radius=8)
         screen.blit(self.game_mode_text_surface, self.game_mode_text_rect)
+
+        # Draw Map Type Button
+        pygame.draw.rect(screen, self.current_map_type_button_color, self.map_type_button_rect, border_radius=8)
+        screen.blit(self.map_type_text_surface, self.map_type_text_rect)

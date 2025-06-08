@@ -13,6 +13,7 @@ class TerrainMaterial(Enum):
 
 class TerrainMap(Enum):
     FLAT = 0
+    HILL = 1
 
 DEFAULT_MATERIAL_CONFIG = [
     {
