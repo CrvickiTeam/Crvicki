@@ -536,9 +536,28 @@ class Player:
             pygame.draw.polygon(screen, hitbox_color, rotated_points, 1)
             pygame.draw.circle(screen, (255, 255, 0), (int(self.x), int(self.y)), 3)
 
+        # Draw health bar (Moved here to be visible for all alive players)
+        bar_width = 40
+        bar_height = 6
+        health_percentage = 0
+        if self.health > 0: # Ensure health is positive before calculating percentage
+            # Assuming max health is 100 as per initialization, if not, this needs to be dynamic
+            # For now, let's assume max_health is accessible or hardcoded as 100 for the bar.
+            # If player_cfg.get("max_health", 100) is the source, it should be stored in self.max_health
+            # For simplicity, using 100.0 as denominator.
+            health_percentage = self.health / 100.0 
+        
+        fill = health_percentage * bar_width
+
+        # Health bar is narisan nad igralcem
+        bar_x = self.x - bar_width // 2
+        bar_y = self.y - self.height // 2 - 10 # Position above the player
+        pygame.draw.rect(screen, (255, 0, 0), (bar_x, bar_y, fill, bar_height))  # rdeče polnilo
+        pygame.draw.rect(screen, (255, 255, 255), (bar_x, bar_y, bar_width, bar_height), 1)  # bel okvir
+
         # === 2. CEV IN INDIKATOR (samo za aktivnega igralca) ===
         if not is_active_player:
-            return
+            return # Pipe and power indicator only for active player
 
         # A. Izračun sidrišča cevi
         anchor_x, anchor_y = self.x, self.y
@@ -599,16 +618,7 @@ class Player:
 
         pygame.draw.line(screen, (255, 255, 255), (int(start_x), int(start_y)), (int(end_x), int(end_y)), 2)
 
-        # Draw health bar
-        bar_width = 40
-        bar_height = 6
-        fill = (self.health / 100) * bar_width
-
-        # Health bar is narisan nad igralcem
-        bar_x = self.x - bar_width // 2
-        bar_y = self.y - self.height // 2 - 10
-        pygame.draw.rect(screen, (255, 0, 0), (bar_x, bar_y, fill, bar_height))  # rdeče polnilo
-        pygame.draw.rect(screen, (255, 255, 255), (bar_x, bar_y, bar_width, bar_height), 1)  # bel okvir
+        # Health bar drawing logic was moved up
         
     def apply_damage(self, damage: int) -> None:
         if not self.alive:

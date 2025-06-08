@@ -333,5 +333,10 @@ class GameManager:
         if self.running and not self.active_weapon: 
             active_player = self.get_active_player()
             if active_player: 
-                indicator_pos = (int(active_player.x), int(active_player.y) - active_player.rect.height // 2 - 10)
+                # Health bar is at y - height/2 - 10, and has height 6.
+                # Indicator should be above that.
+                # Original indicator_pos_y = active_player.y - active_player.rect.height // 2 - 10
+                # New position: above the health bar (which is 6px high and starts at -10 from player top)
+                indicator_y_offset = active_player.rect.height // 2 + 10 + 6 + 5 # player_half_height + health_bar_offset + health_bar_height + indicator_radius_and_padding
+                indicator_pos = (int(active_player.x), int(active_player.y) - indicator_y_offset)
                 pygame.draw.circle(screen, (255, 255, 0), indicator_pos, 5)
