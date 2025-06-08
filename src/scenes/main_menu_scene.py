@@ -1,4 +1,5 @@
 import pygame
+import os # Import the os module for path manipulation
 
 from .scene import Scene
 from core.terrain import TerrainMap # Import TerrainMap
@@ -9,6 +10,7 @@ WHITE = (255, 255, 255)
 LIGHT_GRAY = (200, 200, 200)
 DARK_GRAY = (100, 100, 100)
 BUTTON_DISABLED_COLOR = (160, 160, 160) # Color for disabled buttons
+SKY_BLUE = (135, 206, 235) # A nice sky blue for the background
 
 BUTTON_IDLE_COLOR = (0, 150, 0)
 BUTTON_HOVER_COLOR = DARK_GRAY
@@ -35,18 +37,51 @@ class MainMenuScene(Scene):
 
 
         # Fonts
-        self.title_font = pygame.font.Font(None, 80)
-        self.button_font = pygame.font.Font(None, 40) # Adjusted for potentially more text
+        self.title_font = pygame.font.Font(None, 70) # Adjusted font size
+        self.button_font = pygame.font.Font(None, 40)
 
-        # Title
-        self.title_text_surface = self.title_font.render("Crvicki", True, BLACK)
-        self.title_text_rect = self.title_text_surface.get_rect(center=(self.screen_width // 2, 100))
+        # Title "Crvicki"
+        title_string = "ČRVIČKI"
+        title_color = BLACK # Black for good contrast on sky blue background
+        self.title_text_surface = self.title_font.render(title_string, True, title_color)
+        title_top_y = 50  # Y position for the top of the title
+        self.title_text_rect = self.title_text_surface.get_rect(midtop=(self.screen_width // 2, title_top_y))
+
+        # Load background tank image
+        self.background_tank_image = None
+        self.background_tank_rect = None # Initialize to None
+        try:
+            base_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+            image_path = os.path.join(base_dir, "assets", "graphics", "characters", "GREEN-02OPEN-WORM-HAT-TANK.png")
+            
+            loaded_image = pygame.image.load(image_path).convert_alpha()
+            
+            original_width, original_height = loaded_image.get_size()
+            target_width = 200 # Keep image width as previously defined
+            scale_ratio = target_width / original_width
+            target_height = int(original_height * scale_ratio)
+            self.background_tank_image = pygame.transform.scale(loaded_image, (target_width, target_height))
+            
+            # Position it below the title, centered horizontally
+            padding_title_image = 20 
+            image_top_y = self.title_text_rect.bottom + padding_title_image
+            self.background_tank_rect = self.background_tank_image.get_rect(midtop=(self.screen_width // 2, image_top_y))
+            
+        except pygame.error as e:
+            print(f"Error loading or scaling background tank image: {e}")
+            self.background_tank_image = None
 
         # Button properties
-        button_width = 280 # Increased width for longer text
+        button_width = 280
         button_height = 50
-        button_spacing = 15 # Space between buttons
-        start_y_offset = 250 # Initial Y position for the first button
+        button_spacing = 15
+        
+        # Calculate start_y_offset for buttons, below title and image (if loaded)
+        padding_below_content = 40 
+        if self.background_tank_rect:
+            start_y_offset = self.background_tank_rect.bottom + padding_below_content
+        else: # Fallback if image didn't load
+            start_y_offset = self.title_text_rect.bottom + padding_below_content + 20 # Add some extra padding if no image
 
         # Start Button
         self.start_button_rect = pygame.Rect(
@@ -188,10 +223,14 @@ class MainMenuScene(Scene):
 
 
     def draw(self, screen: pygame.Surface) -> None:
-        screen.fill(WHITE)
+        screen.fill(SKY_BLUE) # Use the new background color
 
         # Draw Title
         screen.blit(self.title_text_surface, self.title_text_rect)
+
+        # Draw the background tank image if it loaded successfully
+        if self.background_tank_image and self.background_tank_rect:
+            screen.blit(self.background_tank_image, self.background_tank_rect)
 
         # Draw Start Button
         pygame.draw.rect(screen, self.current_start_button_color, self.start_button_rect, border_radius=8)
