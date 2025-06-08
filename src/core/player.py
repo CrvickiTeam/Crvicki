@@ -582,7 +582,7 @@ class Player:
                 start_x_indicator = pipe_world_anchor_x + tip_offset_x 
                 start_y_indicator = pipe_world_anchor_y + tip_offset_y
             
-            line_length = 30 + (self.aim_power / self.max_aim_power) * 70
+            line_length = 20 + (self.aim_power / self.max_aim_power) * 50 # Scale line length with power
             end_x_indicator = start_x_indicator + line_length * math.cos(math.radians(self.aim_angle))
             end_y_indicator = start_y_indicator - line_length * math.sin(math.radians(self.aim_angle))
             pygame.draw.line(screen, (255, 255, 255, 180), 
