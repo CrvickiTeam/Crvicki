@@ -1,4 +1,5 @@
 import pygame
+import os # Import os for path joining
 
 from .scene import Scene
 
@@ -8,6 +9,7 @@ WHITE = (255, 255, 255)
 LIGHT_GRAY = (200, 200, 200)
 DARK_GRAY = (100, 100, 100)
 BUTTON_DISABLED_COLOR = (160, 160, 160) # Color for disabled buttons
+LIGHT_GREEN_BACKGROUND = (152, 251, 152) # Light green for background
 
 BUTTON_IDLE_COLOR = (0, 150, 0)
 BUTTON_HOVER_COLOR = DARK_GRAY
@@ -29,9 +31,42 @@ class MainMenuScene(Scene):
         self.title_font = pygame.font.Font(None, 80)
         self.button_font = pygame.font.Font(None, 40) # Adjusted for potentially more text
 
-        # Title
-        self.title_text_surface = self.title_font.render("Crvicki", True, BLACK)
-        self.title_text_rect = self.title_text_surface.get_rect(center=(self.screen_width // 2, 100))
+        # Title - Prepare individual letter surfaces for better kerning
+        self.title_text = "Crvicki"
+        self.title_letter_surfaces = []
+        self.title_letter_rects = []
+        title_total_width = 0
+        letter_spacing = -5 # Adjust for tighter/looser kerning; negative for tighter
+
+        for char in self.title_text:
+            surface = self.title_font.render(char, True, BLACK)
+            self.title_letter_surfaces.append(surface)
+            title_total_width += surface.get_width() + letter_spacing
+        
+        title_total_width -= letter_spacing # Remove last spacing
+
+        current_x_offset = (self.screen_width - title_total_width) // 2
+        title_y_center = 100
+
+        for surface in self.title_letter_surfaces:
+            rect = surface.get_rect(left=current_x_offset, centery=title_y_center)
+            self.title_letter_rects.append(rect)
+            current_x_offset += surface.get_width() + letter_spacing
+
+
+        # Load tank image for background
+        self.tank_image = None
+        try:
+            script_dir = os.path.dirname(__file__)
+            project_root = os.path.abspath(os.path.join(script_dir, "..", ".."))
+            tank_image_path = os.path.join(project_root, "assets", "graphics", "characters", "GREEN-02OPEN-WORM-HAT-TANK.png")
+            self.tank_image = pygame.image.load(tank_image_path).convert_alpha()
+            self.tank_image = pygame.transform.scale(self.tank_image, (100, 100)) # Adjust size as needed
+            self.tank_image_rect = self.tank_image.get_rect(center=(self.screen_width // 2, 180)) # Position below title
+        except pygame.error as e:
+            print(f"Error loading tank image for main menu: {e}")
+            self.tank_image = None
+
 
         # Button properties
         button_width = 280 # Increased width for longer text
@@ -149,10 +184,15 @@ class MainMenuScene(Scene):
 
 
     def draw(self, screen: pygame.Surface) -> None:
-        screen.fill(WHITE)
+        screen.fill(LIGHT_GREEN_BACKGROUND) # Use new background color
 
-        # Draw Title
-        screen.blit(self.title_text_surface, self.title_text_rect)
+        # Draw Title letters
+        for i, surface in enumerate(self.title_letter_surfaces):
+            screen.blit(surface, self.title_letter_rects[i])
+
+        # Draw tank image if loaded
+        if self.tank_image:
+            screen.blit(self.tank_image, self.tank_image_rect)
 
         # Draw Start Button
         pygame.draw.rect(screen, self.current_start_button_color, self.start_button_rect, border_radius=8)
